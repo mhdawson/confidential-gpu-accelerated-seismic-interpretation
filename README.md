@@ -318,6 +318,18 @@ cd confidential-gpu-accelerated-seismic-interpretation
 
 Sample `.npy` seismic sections from the Dutch F3 dataset are included in the `samples/` directory of the repository — use these to try the application without any additional data download.
 
+### Set your deployment namespace
+
+All `make` commands and shell snippets in this guide use a `NAMESPACE` variable for the OpenShift namespace where the application will be deployed. Set and export it once in your shell now — it will carry through the session without needing to be re-specified in each command.
+
+The default namespace used in this quickstart is `seismic-interpretation`:
+
+```bash
+export NAMESPACE=seismic-interpretation
+```
+
+Use any name you prefer. The namespace is created in [Step 1 of Application deployment](#step-1-create-the-project).
+
 ### Hardware prerequisite: Enable TEE in server firmware and kernel parameters
 
 Confidential containers require a hardware Trusted Execution Environment (TEE). This is a one-time server configuration done via your BMC/IPMI console by whoever manages the bare metal hosts. The BIOS settings and kernel parameters must be applied before the kata containers setup below.
@@ -530,7 +542,13 @@ make setup-kata GPU_PASSTHROUGH_NODES="<node1> <node2>"
 
 `setup-gpu-passthrough` is safe to run repeatedly — use it any time you need to add or change which nodes are labeled without re-running the full `setup-kata` (which would re-apply MachineConfigs and trigger another node reboot rollout).
 
-Both `setup-kata` and `setup-gpu-passthrough` apply the `KubeletConfig` that extends the kubelet container-creation timeout (see Step 3 in the manual instructions below). This triggers an additional MachineConfig rolling update and node reboot after the kata setup completes.
+After labeling GPU nodes, configure the GPU Operator for confidential computing mode. This patches the ClusterPolicy to disable the host driver, toolkit, and devicePlugin (which run inside the kata guest VM instead), enable CC Manager and vfioManager, and automatically bind NVSwitches to vfio-pci on SXM GPU nodes:
+
+```bash
+make setup-cc-gpu
+```
+
+`setup-kata` applies the `KubeletConfig` that extends the kubelet container-creation timeout (see Step 4 in the manual instructions below), triggering an additional MachineConfig rolling update and node reboot after the kata setup completes.
 
 </details>
 
@@ -538,12 +556,6 @@ Both `setup-kata` and `setup-gpu-passthrough` apply the `KubeletConfig` that ext
 <summary>Manual instructions</summary>
 
 To manually install Kata containers:
-
-**Prerequisites:**
-- Logged in as cluster-admin
-- TEE kernel parameters active (hardware prerequisite above complete, node rebooted)
-- NVIDIA GPU Operator already installed
-
 
 #### Step 1: Install Node Feature Discovery
 
@@ -1160,7 +1172,6 @@ The attestation policy requires the following values in RVPS before it will rele
 To automatically register RVPS reference values:
 
 ```bash
-NAMESPACE=<your deployment namespace, e.g. seismic-interpretation>
 make setup-attestation NAMESPACE=$NAMESPACE
 ```
 
@@ -1172,7 +1183,6 @@ make setup-attestation NAMESPACE=$NAMESPACE
 To manually register RVPS reference values:
 
 ```bash
-NAMESPACE=<your deployment namespace, e.g. seismic-interpretation>
 REGISTRY=${REGISTRY:-quay.io/rh-ai-quickstart}
 APP_IMG=$REGISTRY/conf-gpu-accel-seismic-interp-deepseismic-app
 MODEL_IMG=$REGISTRY/conf-gpu-accel-seismic-interp-deepseismic-model
@@ -1241,7 +1251,6 @@ MODEL_ENCRYPTION_KEY=7f27f40d746b5d92c2d2fe744096b0712ef9951955de9773b3eb20e2be0
 To automatically register app-specific KBS secrets:
 
 ```bash
-NAMESPACE=<your deployment namespace, e.g. seismic-interpretation>
 make setup-attestation NAMESPACE=$NAMESPACE
 ```
 
@@ -1255,7 +1264,6 @@ To manually register app-specific KBS secrets:
 The commands build the image verification policy for your namespace and registry, then create (or update) the namespace-scoped Secret in `trustee-operator-system` and register it with KBS. Set `REGISTRY` to match the registry where your images are published, or leave it unset to use the published quickstart images at `quay.io/rh-ai-quickstart`.
 
 ```bash
-NAMESPACE=<your deployment namespace, e.g. seismic-interpretation>
 REGISTRY=${REGISTRY:-quay.io/rh-ai-quickstart}
 APP_IMAGE_REPO=$REGISTRY/conf-gpu-accel-seismic-interp-deepseismic-app
 MODEL_IMAGE_REPO=$REGISTRY/conf-gpu-accel-seismic-interp-deepseismic-model
@@ -1302,13 +1310,13 @@ These steps require only `admin` access on the target namespace and `self-provis
 #### Step 1: Create the project
 
 ```bash
-oc new-project seismic-interpretation
+oc new-project $NAMESPACE
 ```
 
 #### Step 2: Deploy the application
 
 ```bash
-make install NAMESPACE=seismic-interpretation
+make install NAMESPACE=$NAMESPACE
 ```
 
 This fetches the KBS TLS certificate from the cluster, builds the initdata blob (AA/CDH configuration for the kata VM), and deploys the app via Helm. On startup the pod goes through the following sequence inside the kata VM:
@@ -1384,7 +1392,6 @@ Confirm KBS is running and the app-specific secrets are registered:
 oc get pods -n trustee-operator-system
 
 # Secrets registered under the deployment namespace
-NAMESPACE=seismic-interpretation
 oc exec -n trustee-operator-system deployment/trustee-deployment -- \
     ls /opt/confidential-containers/kbs/repository/$NAMESPACE/
 # expect: conf-seismic-cosign-key  conf-seismic-image-policy  conf-seismic-model-key
@@ -1460,7 +1467,7 @@ This is not required to run the quickstart. The steps below are for model owners
 - `MODEL_ENCRYPTION_KEY` set in your environment (the AES-256-CBC key used during training)
 - `podman login quay.io` authenticated
 - `cosign` 3.1.2+
-- The trained weights at `model-creation/model-weights/dutchf3_unet_final.pth` — copy them from the training PVC first with `make get-model NAMESPACE=<your-namespace>`
+- The trained weights at `model-creation/model-weights/dutchf3_unet_final.pth` — copy them from the training PVC first with `make get-model NAMESPACE=$NAMESPACE`
 
 #### Step 1: Generate a signing key pair
 
@@ -1510,7 +1517,6 @@ modelcar:
 Update the cosign key stored in KBS — patch just the `cosign-key` field in the namespace Secret and restart Trustee:
 
 ```bash
-NAMESPACE=<your deployment namespace>
 COSIGN_KEY_B64=$(base64 -w0 model-owner-verification-keys/cosign.pub)
 oc patch secret "$NAMESPACE" \
     -n trustee-operator-system \
@@ -1578,7 +1584,6 @@ app:
 If you also generated a new key pair, update the cosign key stored in KBS — patch just the `cosign-key` field in the namespace Secret and restart Trustee:
 
 ```bash
-NAMESPACE=<your deployment namespace>
 COSIGN_KEY_B64=$(base64 -w0 model-owner-verification-keys/cosign.pub)
 oc patch secret "$NAMESPACE" \
     -n trustee-operator-system \
@@ -1616,7 +1621,7 @@ Then re-run the deploy steps from [Step 4](#step-4-deploy-the-application) onwar
 Remove the application — no cluster-admin required:
 
 ```bash
-make uninstall NAMESPACE=seismic-interpretation
+make uninstall NAMESPACE=$NAMESPACE
 oc delete project seismic-interpretation
 ```
 
