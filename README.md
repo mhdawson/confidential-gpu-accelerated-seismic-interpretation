@@ -294,11 +294,11 @@ This quickstart separates one-time platform setup (done by a platform team) from
 
 This quickstart involves two distinct parties. Each section is labeled with which role performs it.
 
-**Model owner** — owns the model weights and decides which application code is permitted to decrypt them. Generates signing keys, encrypts and signs the model and application images, operates Trustee/KBS, and registers secrets with KBS. The model decryption key never leaves Trustee — it is released only after attestation passes. The model owner never shares the key with the application deployer.
+**Model owner** — owns the model weights and decides which application code is permitted to decrypt them. Generates signing keys, encrypts and signs the model and application images, operates Trustee/KBS, and registers secrets with KBS.
 
-**Application deployer** — operates the OpenShift cluster where the application runs. Installs kata confidential containers infrastructure, deploys the application, and uses it. Has no access to the model decryption key or to Trustee administration.
+**Application deployer** — operates the OpenShift cluster where the application runs. Installs kata confidential containers infrastructure, deploys the application, and uses it.
 
-> **Quickstart simplification:** In this quickstart both roles are performed by one person and Trustee runs on the same cluster as the application for demo convenience. In production, Trustee would run on infrastructure controlled by the model owner, separate from the application cluster. The model owner is responsible for: installing Trustee, registering RVPS reference values, registering app-specific secrets with KBS, encrypting and publishing the model, and building and publishing the application image.
+> **Quickstart simplification:** In this quickstart both roles are performed by one person and Trustee runs on the same cluster as the application for demo convenience. In production, Trustee would run on infrastructure controlled by the model owner, separate from the application cluster.
 
 ### Clone the repository
 
@@ -317,11 +317,11 @@ The default namespace used in this quickstart is `seismic-interpretation`:
 export NAMESPACE=seismic-interpretation
 ```
 
-Use any name you prefer. The namespace is created in [Step 1 of Application deployment](#step-1-create-the-project).
+Use any name you prefer. The namespace is created in [Step 1 of Application deployment](#step-1-create-the-project) but earlier steps required NAMESPACE to be defined as the paths used to reference the keys stored in trustee include the namespace as one of the path components.t
 
 ### Hardware prerequisite: Enable TEE in server firmware and kernel parameters
 
-Confidential containers require a hardware Trusted Execution Environment (TEE). This is a one-time server configuration done via your BMC/IPMI console by whoever manages the bare metal hosts. The BIOS settings and kernel parameters must be applied before the kata containers setup below.
+Confidential containers require a hardware Trusted Execution Environment (TEE). This is a one-time server configuration done via your BMC/IPMI console. The BIOS settings and kernel parameters must be applied before the kata containers setup below.
 
 #### Configure BIOS firmware
 
@@ -373,10 +373,12 @@ oc debug node/$NODE -- chroot /host dmesg | grep -i snp
 
 #### Apply kernel parameters
 
+The node must boot with TDX kernel parameters active before the OSC operator can install kata-cc. This step applies MachineConfigs and triggers a node reboot.
+
 <details open>
 <summary>Make instructions</summary>
 
-To automatically apply the TEE kernel parameters (cluster-admin required):
+To automatically apply the TEE kernel parameters (cluster-admin required). One or more node reboots will occur as MachineConfig applies the kernel arguments:
 
 ```bash
 make setup-intel-tee    # Intel Xeon with TDX
@@ -390,8 +392,6 @@ make setup-amd-tee      # AMD EPYC with SEV-SNP
 <summary>Manual instructions</summary>
 
 To manually apply the TEE kernel parameters:
-
-The node must boot with TDX kernel parameters active before the OSC operator can install kata-cc. This step applies two MachineConfigs and triggers a node reboot.
 
 > **NOTE for multi-node clusters:** The MachineConfigs below use `role: master`. On multi-node clusters where kata workloads run on worker nodes, change `machineconfiguration.openshift.io/role: master` to `worker` in both blocks before applying.
 
@@ -460,19 +460,6 @@ oc wait mcp/master --for=condition=Updated=True --timeout=30m
 
 On single-node clusters the API server itself reboots during this wait, so the command will disconnect for 2–5 minutes. Re-run it once the cluster is reachable again.
 
-After the node comes back, verify TDX is active in the kernel:
-
-```bash
-# List worker nodes to identify the target hardware node:
-oc get nodes -l node-role.kubernetes.io/worker -o custom-columns=NAME:.metadata.name --no-headers
-# Set NODE to the target node (auto-detected on single-node clusters):
-NODE=$(oc get nodes -l 'node-role.kubernetes.io/worker,!node-role.kubernetes.io/master' \
-    -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || \
-    oc get nodes -l node-role.kubernetes.io/worker \
-    -o jsonpath='{.items[0].metadata.name}')
-oc debug node/$NODE -- chroot /host dmesg | grep -i tdx
-# Expected: "virt/tdx: BIOS enabled" and "virt/tdx: module initialized"
-```
 
 </details>
 
