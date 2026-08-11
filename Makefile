@@ -1036,12 +1036,13 @@ verify-gpu-passthrough:
 	\
 	echo ""; \
 	echo "=== ClusterPolicy settings ==="; \
-	CP_JSON=$$(oc get clusterpolicy gpu-cluster-policy -o json 2>/dev/null); \
-	if [ -z "$$CP_JSON" ]; then \
+	CP_TMPFILE=$$(mktemp); \
+	oc get clusterpolicy gpu-cluster-policy -o json > "$$CP_TMPFILE" 2>/dev/null || true; \
+	if [ ! -s "$$CP_TMPFILE" ]; then \
 	    fail "ClusterPolicy gpu-cluster-policy not found"; \
 	    echo "       Hint: install the NVIDIA GPU Operator via OperatorHub first."; \
 	else \
-	    SW_ENABLED=$$(echo "$$CP_JSON" | python3 -c "import json,sys; d=json.load(sys.stdin); print(str(d.get('spec',{}).get('sandboxWorkloads',{}).get('enabled',False)).lower())"); \
+	    SW_ENABLED=$$(python3 -c "import json,sys; d=json.loads(open(sys.argv[1]).read(), strict=False); print(str(d.get('spec',{}).get('sandboxWorkloads',{}).get('enabled',False)).lower())" "$$CP_TMPFILE"); \
 	    if [ "$$SW_ENABLED" = "true" ]; then \
 	        ok "sandboxWorkloads.enabled = true"; \
 	    else \
@@ -1049,7 +1050,7 @@ verify-gpu-passthrough:
 	        echo "       Hint: run: make setup-gpu-passthrough GPU_PASSTHROUGH_NODES=\"<node1> <node2>\""; \
 	    fi; \
 	    \
-	    VFIO_ENABLED=$$(echo "$$CP_JSON" | python3 -c "import json,sys; d=json.load(sys.stdin); print(str(d.get('spec',{}).get('vfioManager',{}).get('enabled',False)).lower())"); \
+	    VFIO_ENABLED=$$(python3 -c "import json,sys; d=json.loads(open(sys.argv[1]).read(), strict=False); print(str(d.get('spec',{}).get('vfioManager',{}).get('enabled',False)).lower())" "$$CP_TMPFILE"); \
 	    if [ "$$VFIO_ENABLED" = "true" ]; then \
 	        ok "vfioManager.enabled = true"; \
 	    else \
@@ -1057,7 +1058,7 @@ verify-gpu-passthrough:
 	        echo "       Hint: oc patch clusterpolicy gpu-cluster-policy --type merge -p '{\"spec\":{\"vfioManager\":{\"enabled\":true}}}'"; \
 	    fi; \
 	    \
-	    CC_ENABLED=$$(echo "$$CP_JSON" | python3 -c "import json,sys; d=json.load(sys.stdin); print(str(d.get('spec',{}).get('ccManager',{}).get('enabled',False)).lower())"); \
+	    CC_ENABLED=$$(python3 -c "import json,sys; d=json.loads(open(sys.argv[1]).read(), strict=False); print(str(d.get('spec',{}).get('ccManager',{}).get('enabled',False)).lower())" "$$CP_TMPFILE"); \
 	    if [ "$$CC_ENABLED" = "true" ]; then \
 	        ok "ccManager.enabled = true"; \
 	    else \
@@ -1065,7 +1066,7 @@ verify-gpu-passthrough:
 	        echo "       Hint: oc patch clusterpolicy gpu-cluster-policy --type merge -p '{\"spec\":{\"ccManager\":{\"enabled\":true}}}'"; \
 	    fi; \
 	    \
-	    DP_ENABLED=$$(echo "$$CP_JSON" | python3 -c "import json,sys; d=json.load(sys.stdin); print(str(d.get('spec',{}).get('devicePlugin',{}).get('enabled',True)).lower())"); \
+	    DP_ENABLED=$$(python3 -c "import json,sys; d=json.loads(open(sys.argv[1]).read(), strict=False); print(str(d.get('spec',{}).get('devicePlugin',{}).get('enabled',True)).lower())" "$$CP_TMPFILE"); \
 	    if [ "$$DP_ENABLED" = "false" ]; then \
 	        ok "devicePlugin.enabled = false"; \
 	    else \
@@ -1073,7 +1074,7 @@ verify-gpu-passthrough:
 	        echo "       Hint: oc patch clusterpolicy gpu-cluster-policy --type merge -p '{\"spec\":{\"devicePlugin\":{\"enabled\":false}}}'"; \
 	    fi; \
 	    \
-	    DRV_ENABLED=$$(echo "$$CP_JSON" | python3 -c "import json,sys; d=json.load(sys.stdin); print(str(d.get('spec',{}).get('driver',{}).get('enabled',True)).lower())"); \
+	    DRV_ENABLED=$$(python3 -c "import json,sys; d=json.loads(open(sys.argv[1]).read(), strict=False); print(str(d.get('spec',{}).get('driver',{}).get('enabled',True)).lower())" "$$CP_TMPFILE"); \
 	    if [ "$$DRV_ENABLED" = "false" ]; then \
 	        ok "driver.enabled = false"; \
 	    else \
@@ -1081,7 +1082,7 @@ verify-gpu-passthrough:
 	        echo "       Hint: oc patch clusterpolicy gpu-cluster-policy --type merge -p '{\"spec\":{\"driver\":{\"enabled\":false}}}'"; \
 	    fi; \
 	    \
-	    TK_ENABLED=$$(echo "$$CP_JSON" | python3 -c "import json,sys; d=json.load(sys.stdin); print(str(d.get('spec',{}).get('toolkit',{}).get('enabled',True)).lower())"); \
+	    TK_ENABLED=$$(python3 -c "import json,sys; d=json.loads(open(sys.argv[1]).read(), strict=False); print(str(d.get('spec',{}).get('toolkit',{}).get('enabled',True)).lower())" "$$CP_TMPFILE"); \
 	    if [ "$$TK_ENABLED" = "false" ]; then \
 	        ok "toolkit.enabled = false"; \
 	    else \
@@ -1089,6 +1090,7 @@ verify-gpu-passthrough:
 	        echo "       Hint: oc patch clusterpolicy gpu-cluster-policy --type merge -p '{\"spec\":{\"toolkit\":{\"enabled\":false}}}'"; \
 	    fi; \
 	fi; \
+	rm -f "$$CP_TMPFILE"; \
 	\
 	echo ""; \
 	echo "=== Node labels ==="; \
