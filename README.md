@@ -1028,6 +1028,8 @@ The Intel Device Plugin Operator manages the SGX Device Plugin DaemonSet that ex
    oc apply -f helm/osc/templates/intel-dcap-tdxqgs-cr.yaml
    ```
 
+</details>
+
 Verify the DCAP stack:
 
 ```bash
@@ -1039,8 +1041,6 @@ make verify-dcap
 - ✓ `intel-tdx-dcap-operator-*` CSV `Succeeded` in `intel-dcap`
 - ✓ `tdxquotegenerationservices.trustedservices.intel.com` shows `intel-tdx-dcap` with `READY: True`
 - ✓ `intel-tdx-dcap-qgs-*` pod `Running` in `intel-dcap`
-
-</details>
 
 ---
 

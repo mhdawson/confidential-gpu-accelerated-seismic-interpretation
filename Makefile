@@ -120,6 +120,10 @@ help:
 	@echo "    setup-gpu-passthrough    - Label GPU node(s) for kata VM passthrough without re-running setup-kata"
 	@echo "                               Requires GPU_PASSTHROUGH_NODES=\"<node1> <node2>\""
 	@echo "                               Safe to run repeatedly — idempotent"
+	@echo "    setup-cc-gpu             - Configure GPU Operator for confidential computing mode"
+	@echo "                               Patches ClusterPolicy: ccManager on, driver/toolkit/devicePlugin off,"
+	@echo "                               vfioManager on; auto-detects NVSwitch nodes for BIND_NVSWITCHES"
+	@echo "                               Requires setup-kata to have completed first"
 	@echo "    setup-dcap               - Deploy Intel SGX Device Plugin and Intel TDX DCAP Operator (QGS + PCCS)"
 	@echo "                               Required for TDX attestation: QGS listens on vsock port 4050 so"
 	@echo "                               CDH inside kata VMs can generate attestation quotes"
@@ -893,7 +897,7 @@ setup-kata:
 	    echo "       Run: oc get mcp && oc get nodes"; \
 	    exit 1; \
 	fi; \
-	echo "=== setup-kata complete — run make setup-trustee-in-cluster next ==="
+	echo "=== setup-kata complete — run make setup-cc-gpu next ==="
 
 .PHONY: setup-gpu-passthrough
 setup-gpu-passthrough:
@@ -926,6 +930,98 @@ setup-gpu-passthrough:
 	echo "Nodes labeled vm-passthrough will stop advertising nvidia.com/gpu"; \
 	echo "and advertise nvidia.com/pgpu once the Sandbox Device Plugin restarts."; \
 	echo "Verify with: oc get node <node> -o jsonpath='{.status.allocatable}'"
+
+.PHONY: setup-cc-gpu
+setup-cc-gpu:
+	@set -e; \
+	echo "=== setup-cc-gpu: Configure GPU Operator for confidential containers ==="; \
+	echo "=== Pre-flight checks ==="; \
+	if ! oc get csv -n nvidia-gpu-operator 2>/dev/null \
+	        | grep -q "gpu-operator.*Succeeded"; then \
+	    echo "ERROR: NVIDIA GPU Operator not found (namespace: nvidia-gpu-operator)."; \
+	    echo "       Install it via OperatorHub before running this target."; \
+	    exit 1; \
+	fi; \
+	echo "GPU Operator: OK"; \
+	if ! oc get runtimeclass kata-cc-nvidia-gpu 2>/dev/null | grep -q .; then \
+	    echo "ERROR: kata-cc-nvidia-gpu runtimeClass not found."; \
+	    echo "       Run make setup-kata first."; \
+	    exit 1; \
+	fi; \
+	echo "kata-cc-nvidia-gpu runtimeClass: OK"; \
+	\
+	echo "=== Patching ClusterPolicy for confidential computing mode ==="; \
+	echo "  ccManager: enabled=true, defaultMode=on"; \
+	echo "  driver/toolkit/devicePlugin: enabled=false (run inside kata guest VM)"; \
+	oc patch clusterpolicy gpu-cluster-policy --type merge \
+	    -p '{"spec":{"ccManager":{"enabled":true,"defaultMode":"on"},"driver":{"enabled":false},"toolkit":{"enabled":false},"devicePlugin":{"enabled":false}}}'; \
+	\
+	echo "Checking for NVLink/SXM GPU nodes (nvidia.com/gpu.deploy.nvsm label)..."; \
+	NVSWITCH_COUNT=$$(oc get nodes -l 'nvidia.com/gpu.deploy.nvsm' --no-headers 2>/dev/null \
+	    | wc -l | tr -d ' '); \
+	if [ "$$NVSWITCH_COUNT" -gt 0 ]; then \
+	    echo "  NVSwitch node(s) detected — enabling vfioManager with BIND_NVSWITCHES=true"; \
+	    oc patch clusterpolicy gpu-cluster-policy --type=merge \
+	        -p '{"spec":{"vfioManager":{"enabled":true,"env":[{"name":"BIND_NVSWITCHES","value":"true"}]}}}'; \
+	else \
+	    echo "  No NVSwitch nodes detected — enabling vfioManager without BIND_NVSWITCHES"; \
+	    oc patch clusterpolicy gpu-cluster-policy --type=merge \
+	        -p '{"spec":{"vfioManager":{"enabled":true}}}'; \
+	fi; \
+	\
+	echo "Waiting for GPU Operator to reconcile (up to 10 min)..."; \
+	echo "  nvidia-driver-daemonset will be removed; cc-manager and vfio-manager will start"; \
+	DEADLINE=$$(( $$(date +%s) + 600 )); \
+	while [ $$(date +%s) -lt $$DEADLINE ]; do \
+	    DRIVER_DS=$$(oc get daemonset -n nvidia-gpu-operator \
+	        nvidia-driver-daemonset --ignore-not-found --no-headers 2>/dev/null \
+	        | wc -l | tr -d ' '); \
+	    CC_RUNNING=$$(oc get pods -n nvidia-gpu-operator --no-headers 2>/dev/null \
+	        | grep cc-manager | grep Running | wc -l | tr -d ' '); \
+	    VFIO_RUNNING=$$(oc get pods -n nvidia-gpu-operator --no-headers 2>/dev/null \
+	        | grep vfio-manager | grep Running | wc -l | tr -d ' '); \
+	    if [ "$$DRIVER_DS" = "0" ] && [ "$$CC_RUNNING" -gt 0 ] && [ "$$VFIO_RUNNING" -gt 0 ]; then \
+	        echo "  GPU Operator reconciled: driver removed, cc-manager and vfio-manager running."; \
+	        break; \
+	    fi; \
+	    printf "  driver-daemonset: %s  cc-manager running: %s  vfio-manager running: %s\n" \
+	        "$$DRIVER_DS" "$$CC_RUNNING" "$$VFIO_RUNNING"; \
+	    sleep 20; \
+	done; \
+	if [ $$(date +%s) -ge $$DEADLINE ]; then \
+	    echo "ERROR: GPU Operator did not reconcile in 10 min."; \
+	    echo "       Check: oc get pods -n nvidia-gpu-operator"; \
+	    echo "       Logs:  oc logs -n nvidia-gpu-operator deploy/gpu-operator --tail=30"; \
+	    exit 1; \
+	fi; \
+	\
+	echo ""; \
+	echo "=== Verifying CC mode labels on GPU nodes ==="; \
+	GPU_NODES=$$(oc get nodes -l nvidia.com/gpu.present=true \
+	    --no-headers 2>/dev/null | awk '{print $$1}'); \
+	for GPU_NODE in $$GPU_NODES; do \
+	    echo ""; \
+	    echo "  Node: $$GPU_NODE"; \
+	    for LABEL in \
+	        "nvidia.com/gpu.deploy.vfio-manager" \
+	        "nvidia.com/gpu.deploy.kata-sandbox-device-plugin" \
+	        "nvidia.com/cc.mode.state" \
+	        "nvidia.com/cc.ready.state" \
+	        "nvidia.com/gpu.deploy.cc-manager"; do \
+	        VAL=$$(oc get node "$$GPU_NODE" \
+	            -o jsonpath="{.metadata.labels['$$LABEL']}" 2>/dev/null || true); \
+	        if [ -n "$$VAL" ]; then \
+	            echo "  ✓ $$LABEL: $$VAL"; \
+	        else \
+	            echo "  ✗ $$LABEL: (MISSING)"; \
+	        fi; \
+	    done; \
+	done; \
+	\
+	echo ""; \
+	echo "=== setup-cc-gpu complete ==="; \
+	echo "If cc.mode.state is 'on' and cc.ready.state is 'true', GPU is ready for kata CC workloads."; \
+	echo "Run make setup-dcap next (Intel TDX), or make setup-trustee-in-cluster if DCAP is already configured."
 
 .PHONY: setup-dcap
 setup-dcap:
