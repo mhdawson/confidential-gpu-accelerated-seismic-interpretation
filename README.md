@@ -236,14 +236,18 @@ flowchart LR
 
 ### Minimum hardware requirements
 
+It is recommended that this quickstart only be deployed in cluster not being used concurrently for other deployments. Installation requires multiple node reboots and applies configuration that may be incompatible with deployemnts not using confidential containers.
+
 | Component | Minimum | Notes |
 |---|---|---|
 | GPU | NVIDIA GPU with Confidential Computing mode support (e.g. H100, H200, B100) | Hopper architecture and later support NVIDIA CC mode and NRAS attestation. Consumer GPUs (RTX 3090, RTX 4090) and older data center GPUs (A100) do not support CC mode and cannot pass the NVIDIA attestation check. |
 | CPU | Intel® Xeon 5th Gen+ (Emerald Rapids) with TDX, or AMD EPYC 9004 series (Genoa) with SEV-SNP | TEE must be enabled in the BIOS. Earlier CPU generations may not support TDX or SEV-SNP. |
 | RAM | 128GB | The kata VM takes 24GB, OCP control plane requires ~32GB, and GPU/OSC/Trustee system pods consume additional memory. 64GB is insufficient in practice. |
-| Storage | 50GB | For ModelCar image cache |
+| Storage | 50GB | For ModelCar image cache |o
 
 **NOTE:** A CPU TEE (Intel® TDX or AMD SEV-SNP) and NVIDIA CC mode are **both** hard requirements — the Key Broker Server will not release the model decryption key unless all three attestation checks pass.
+
+**NOTE:** At this point in time the quickstart has only been validate to work with Intel TDX, validate with AMD SEV-SNP is a work in progress
 
 ### Minimum software requirements
 
@@ -252,7 +256,7 @@ flowchart LR
 | OpenShift Container Platform | 4.21.24+ | Required by OpenShift Sandboxed Containers 1.13 with confidential containers and GPU support (bare metal + GPU requires 4.21.24+) |
 | Red Hat OpenShift AI | 3.4+ | Provides the model serving stack and installs the NVIDIA GPU Operator (26.3.0 required for confidential GPU support with OSC 1.13) and CUDA runtime — install via OperatorHub |
 | Trustee (KBS) | 1.1.0 | `confidential-containers/trustee` — Key Broker Server, deployed as part of this quickstart |
-| Cosign | 2.0+ | For verifying model image signatures; installed locally for the optional encrypt step |
+| Cosign | 2.0+ | For verifying model image signatures; installed locally for the optional encrypt step and sign steps |
 
 ### Network connectivity requirements
 
@@ -271,24 +275,34 @@ Attestation requires outbound HTTPS (port 443) access from the clusters to the f
 
 ### Required user permissions
 
-This quickstart separates one-time platform setup (done by a platform team) from per-deployment application work (done by application teams). Most users only need namespace-level access.
+**Cluster-admin tasks (done once per cluster):**
 
-**Platform setup (cluster-admin, done once per cluster):**
-- Installing the OpenShift Sandboxed Containers, NFD, and NVIDIA GPU operators — these create cluster-scoped CRDs and ClusterRoles
-- Creating `KataConfig` and `NodeFeatureRule` — cluster-scoped resources
+| Task | Who |
+|---|---|
+| Apply TEE kernel parameters (`setup-intel-tee` / `setup-amd-tee`) | Application deployer |
+| Kata containers setup — NFD, OSC operators, KataConfig, GPU Operator CC config | Application deployer |
+| Intel TDX DCAP setup (Intel TDX only) | Application deployer |
+| Install Trustee operator and configure KBS | Model owner |
+
+**Tasks requiring admin on `trustee-operator-system` (done once per cluster):**
+
+| Task | Who |
+|---|---|
+| Register RVPS reference values | Model owner |
+| Register app-specific secrets with KBS | Model owner |
 
 **Application deployment (no cluster-admin required):**
 
 | Task | Minimum role |
 |---|---|
-| Create the `trustee-system` project | `self-provisioner` — the built-in OpenShift role that lets authenticated users create their own projects; assigned to all users by default |
-| Deploy and configure the KBS | `admin` on the `trustee-system` namespace |
-| Create the `seismic-interpretation` project | `self-provisioner` |
-| Deploy the application, create secrets and routes | `edit` on the `seismic-interpretation` namespace |
+| Create the application project | `self-provisioner` |
+| Deploy the application (`make install`) | `admin` on `$NAMESPACE` |
 
 ---
 
 ## Deploy
+
+For most deployment steps, the quickstart provides both `make` targets and manual instructions. The `make` targets are easier and faster; the manual instructions give more detail on what each step does. Make instructions are expanded by default — manual instructions are collapsed and can be expanded by clicking their section header. If you are new to any of the technologies involved, reading through the manual instructions will help you better understand what each step is doing.
 
 ### Roles
 
@@ -487,11 +501,13 @@ make check-prereqs
 
 ### Kata containers setup — application deployer (cluster-admin, once per cluster)
 
-Kata Containers is an open-source container runtime that runs each pod inside a lightweight virtual machine rather than sharing the host kernel. Unlike standard containers — which rely on Linux namespaces and cgroups for isolation — a kata container gets its own dedicated VM kernel, meaning a compromised workload cannot affect the host OS or other pods. In this quickstart, the `kata-cc` runtime variant goes further: it runs the VM inside a hardware Trust Domain (Intel® TDX or AMD SEV-SNP), so the pod's memory is encrypted and inaccessible even to the hypervisor or cluster administrator. The `kata-cc-nvidia-gpu` runtime extends this with GPU passthrough, giving the workload direct, encrypted access to the NVIDIA GPU without exposing data outside the Trust Domain.
+Kata Containers is an open-source container runtime that runs each pod inside a lightweight virtual machine rather than sharing the host kernel. Unlike standard containers — which rely on Linux namespaces and cgroups for isolation — a kata container gets its own dedicated VM kernel, meaning a compromised workload cannot affect the host OS or other pods. The `kata-cc` runtime variant goes further: it runs the VM inside a hardware Trust Domain (Intel® TDX or AMD SEV-SNP), so the pod's memory is encrypted and inaccessible even to the hypervisor or cluster administrator. The `kata-cc-nvidia-gpu` runtime extends this with GPU passthrough, giving the workload direct, encrypted access to the NVIDIA GPU without exposing data outside the Trust Domain. 
 
-Node Feature Discovery (NFD) and OpenShift Sandboxed Containers (OSC) together enable these runtimes on the node. NFD detects the active TEE hardware and labels the node; OSC uses those labels to install the `kata-cc` and `kata-cc-nvidia-gpu` runtimeClasses that pods in this quickstart use.
+This quickstart usees the kata-cc-nvidia-gpu runtime class to ensure that both the cpu and gpu memory are encrypted so that it is only accessible within the pod itself.
 
-OSC is Red Hat's supported, productized distribution of Kata Containers. It installs and manages the runtime via an OLM operator, integrates with OpenShift's MachineConfig and node lifecycle management, and adds the `kata-cc` confidential containers variant with Intel® TDX / AMD SEV-SNP support and NVIDIA GPU passthrough on top of the upstream Kata Containers project.
+Node Feature Discovery (NFD) and OpenShift Sandboxed Containers (OSC) together enable these runtimes on the node. NFD detects the active TEE hardware and labels the node; OSC uses those labels to install the `kata-cc-nvidia-gpu` runtimeClass that pods in this quickstart use.
+
+OSC is Red Hat's supported, productized distribution of Kata Containers. It installs and manages the runtime via an OLM operator, integrates with OpenShift's MachineConfig and node lifecycle management, and adds the `kata-cc-nvidia-gpu` confidential containers variant with Intel® TDX / AMD SEV-SNP support and NVIDIA GPU passthrough on top of the upstream Kata Containers project.
 
 For more on Kata Containers, see the [Kata Containers documentation](https://katacontainers.io/) and the [OpenShift Sandboxed Containers 1.13 documentation](https://docs.redhat.com/en/documentation/openshift_sandboxed_containers/1.13).
 
@@ -510,12 +526,6 @@ After `setup-kata` completes, label the GPU node(s) you want to dedicate to kata
 make setup-gpu-passthrough GPU_PASSTHROUGH_NODES="<node1> <node2>"
 ```
 
-You can also pass `GPU_PASSTHROUGH_NODES` directly to `setup-kata` to do both in one step:
-
-```bash
-make setup-kata GPU_PASSTHROUGH_NODES="<node1> <node2>"
-```
-
 `setup-gpu-passthrough` is safe to run repeatedly — use it any time you need to add or change which nodes are labeled without re-running the full `setup-kata` (which would re-apply MachineConfigs and trigger another node reboot rollout).
 
 After labeling GPU nodes, configure the GPU Operator for confidential computing mode. This patches the ClusterPolicy to disable the host driver, toolkit, and devicePlugin (which run inside the kata guest VM instead), enable CC Manager and vfioManager, and automatically bind NVSwitches to vfio-pci on SXM GPU nodes:
@@ -523,8 +533,6 @@ After labeling GPU nodes, configure the GPU Operator for confidential computing 
 ```bash
 make setup-cc-gpu
 ```
-
-`setup-kata` applies the `KubeletConfig` that extends the kubelet container-creation timeout (see Step 4 in the manual instructions below), triggering an additional MachineConfig rolling update and node reboot after the kata setup completes.
 
 </details>
 
@@ -642,7 +650,7 @@ If the label is not present, the BIOS settings are not correctly saved — revis
 
 > **NOTE:** In production, Trustee should run on a dedicated trusted cluster, separate from the cluster running the application workload. The application cluster is considered untrusted — Trustee releases the model decryption key only after the workload passes attestation ensuring that all requirements have been met. This quickstart deploys both Trustee and the application on the same cluster to simplify getting started. If you are running Trustee on a separate trusted cluster, perform this step on the application cluster only — the Trustee cluster does not need OpenShift Sandboxed Containers installed.
 
-> **WARNING:** Applying the KataConfig triggers a node reboot rollout. Worker nodes will restart one at a time and this takes 10–20 minutes. Do not do this during a maintenance window freeze.
+> **WARNING:** Applying the KataConfig triggers a node reboot rollout. Worker nodes will restart one at a time and this takes 10–20 minutes.
 
 1. Go to **Operators → OperatorHub**
 2. Search for "OpenShift sandboxed containers"
@@ -801,7 +809,7 @@ oc exec -n nvidia-gpu-operator $SANDBOX_POD -- \
 
 #### Step 3: Configure GPU Operator for confidential containers
 
-Confidential GPU workloads using the `kata-cc-nvidia-gpu` runtime require additional ClusterPolicy changes specific to CC (confidential computing) mode. In CC mode the NVIDIA driver runs **inside the kata guest VM** (baked into the kata guest OS image provided by OSC) — the GPU Operator must not also load it on the host. If both `driver.enabled: true` and `vfioManager.enabled: true` are set, the driver daemonset and the vfioManager fight over the GPU, leaving the kernel IOMMU IOAS in a dirty state after pod restarts and preventing subsequent pods from starting. This is documented in [OpenShift Sandboxed Containers 1.13, section 4.10.6](https://docs.redhat.com/en/documentation/openshift_sandboxed_containers/1.13).
+Confidential GPU workloads using the `kata-cc-nvidia-gpu` runtime require additional ClusterPolicy changes specific to CC (confidential computing) mode. In CC mode the NVIDIA driver runs **inside the kata guest VM** (baked into the kata guest OS image provided by OSC) — the GPU Operator must not also load it on the host. If both `driver.enabled: true` and `vfioManager.enabled: true` are set, the driver daemonset and the vfioManager may fight over the GPU. for more details see [OpenShift Sandboxed Containers 1.13, section 4.10.6](https://docs.redhat.com/en/documentation/openshift_sandboxed_containers/1.13).
 
 For confidential GPU passthrough the required ClusterPolicy values are:
 
