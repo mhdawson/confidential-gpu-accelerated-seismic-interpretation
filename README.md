@@ -17,9 +17,10 @@ AI-powered classification from North Sea seismic data — running with a three-f
   - [Network connectivity requirements](#network-connectivity-requirements)
   - [Required user permissions](#required-user-permissions)
 - [Deploy](#deploy)
-  - [Clone the repository](#clone-the-repository)
-  - [Hardware prerequisite: Enable TEE in server firmware and kernel parameters](#hardware-prerequisite-enable-tee-in-server-firmware-and-kernel-parameters)
   - [Roles](#roles)
+  - [Clone the repository](#clone-the-repository)
+  - [Set your deployment namespace](#set-your-deployment-namespace)
+  - [Hardware prerequisite: Enable TEE in server firmware and kernel parameters](#hardware-prerequisite-enable-tee-in-server-firmware-and-kernel-parameters)
   - [Kata containers setup — application deployer (cluster-admin, once per cluster)](#kata-containers-setup--application-deployer-cluster-admin-once-per-cluster)
   - [Intel TDX Quote Generation Service setup — application deployer (cluster-admin, once per cluster, Intel TDX only)](#intel-tdx-quote-generation-service-setup--application-deployer-cluster-admin-once-per-cluster-intel-tdx-only)
   - [Trustee setup — model owner (cluster-admin, once per cluster)](#trustee-setup--model-owner-cluster-admin-once-per-cluster)
@@ -297,7 +298,7 @@ This quickstart involves two distinct parties. Each section is labeled with whic
 
 **Application deployer** — operates the OpenShift cluster where the application runs. Installs kata confidential containers infrastructure, deploys the application, and uses it. Has no access to the model decryption key or to Trustee administration.
 
-> **Quickstart simplification:** In this quickstart both roles are performed by one person and Trustee runs on the same cluster as the application for demo convenience. In production, Trustee would run on infrastructure controlled by the model owner, separate from the application cluster. Steps 1–5 of Trustee setup would be performed by whoever operates that infrastructure; Steps 6 and 7 and both Optional sections are always model owner responsibilities.
+> **Quickstart simplification:** In this quickstart both roles are performed by one person and Trustee runs on the same cluster as the application for demo convenience. In production, Trustee would run on infrastructure controlled by the model owner, separate from the application cluster. The model owner is responsible for: installing Trustee, registering RVPS reference values, registering app-specific secrets with KBS, encrypting and publishing the model, and building and publishing the application image.
 
 ### Clone the repository
 
@@ -305,8 +306,6 @@ This quickstart involves two distinct parties. Each section is labeled with whic
 git clone https://github.com/rh-ai-quickstart/confidential-gpu-accelerated-seismic-interpretation
 cd confidential-gpu-accelerated-seismic-interpretation
 ```
-
-Sample `.npy` seismic sections from the Dutch F3 dataset are included in the `samples/` directory of the repository — use these to try the application without any additional data download.
 
 ### Set your deployment namespace
 
@@ -1006,7 +1005,7 @@ make verify-dcap
 
 ### Trustee setup — model owner (cluster-admin, once per cluster)
 
-> **In this quickstart** the application deployer also runs Trustee setup for demo convenience. In production this section is performed by the model owner on independently controlled infrastructure. Steps 6 and 7 are always model owner responsibilities regardless of deployment topology.
+> **In this quickstart** the application deployer also runs Trustee setup for demo convenience. In production this section is performed by the model owner on independently controlled infrastructure. Register RVPS reference values and Register app-specific secrets with KBS are always model owner responsibilities regardless of deployment topology.
 
 #### Install Trustee
 
