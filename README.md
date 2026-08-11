@@ -372,7 +372,10 @@ oc debug node/$NODE -- chroot /host dmesg | grep -i snp
 
 #### Apply kernel parameters
 
-To apply the kernel parameters automatically (cluster-admin required):
+<details open>
+<summary>Make instructions</summary>
+
+To automatically apply the TEE kernel parameters (cluster-admin required):
 
 ```bash
 make setup-intel-tee    # Intel Xeon with TDX
@@ -380,8 +383,12 @@ make setup-intel-tee    # Intel Xeon with TDX
 make setup-amd-tee      # AMD EPYC with SEV-SNP
 ```
 
+</details>
+
 <details>
 <summary>Manual instructions</summary>
+
+To manually apply the TEE kernel parameters:
 
 The node must boot with TDX kernel parameters active before the OSC operator can install kata-cc. This step applies two MachineConfigs and triggers a node reboot.
 
@@ -500,7 +507,10 @@ OSC is Red Hat's supported, productized distribution of Kata Containers. It inst
 
 For more on Kata Containers, see the [Kata Containers documentation](https://katacontainers.io/) and the [OpenShift Sandboxed Containers 1.13 documentation](https://docs.redhat.com/en/documentation/openshift_sandboxed_containers/1.13).
 
-To perform automatically (after the hardware prerequisite above is complete):
+<details open>
+<summary>Make instructions</summary>
+
+To automatically install Kata containers and GPU passthrough (after the hardware prerequisite above is complete):
 
 ```bash
 make setup-kata
@@ -522,8 +532,12 @@ make setup-kata GPU_PASSTHROUGH_NODES="<node1> <node2>"
 
 Both `setup-kata` and `setup-gpu-passthrough` apply the `KubeletConfig` that extends the kubelet container-creation timeout (see Step 3 in the manual instructions below). This triggers an additional MachineConfig rolling update and node reboot after the kata setup completes.
 
+</details>
+
 <details>
 <summary>Manual instructions</summary>
+
+To manually install Kata containers:
 
 **Prerequisites:**
 - Logged in as cluster-admin
@@ -952,14 +966,21 @@ QGS uses the Intel Provisioning Certificate Service (PCS) to fetch the PCK (Plat
 
 The key is a 32-character hexadecimal string. Keep it secret — it is passed to `make setup-dcap` and stored in the cluster as a Kubernetes Secret in the `intel-dcap` namespace.
 
-To install the operators automatically (cluster-admin required):
+<details open>
+<summary>Make instructions</summary>
+
+To automatically install the Intel TDX DCAP operators (cluster-admin required):
 
 ```bash
 make setup-dcap INTEL_API_KEY=<your-intel-pcs-api-key>
 ```
 
+</details>
+
 <details>
 <summary>Manual instructions</summary>
+
+To manually install the Intel TDX DCAP operators:
 
 #### Step 1: Install the Intel Device Plugin Operator
 
@@ -1021,14 +1042,21 @@ The Trustee Attestation Service contacts NVIDIA NRAS (`nras.attestation.nvidia.c
 2. Set a name (e.g. `NRAS Key`), set expiration, and under **Services Included** check **Public API Endpoints**
 3. Copy the key immediately — it is shown only once
 
-To set up Trustee automatically (cluster-admin required):
+<details open>
+<summary>Make instructions</summary>
+
+To automatically install Trustee (cluster-admin required):
 
 ```bash
 make setup-trustee-in-cluster NRAS_API_KEY=<your-ngc-api-key>
 ```
 
+</details>
+
 <details>
 <summary>Manual instructions</summary>
+
+To manually install Trustee:
 
 #### Step 1: Install the Trustee operator
 
@@ -1126,14 +1154,22 @@ The attestation policy requires the following values in RVPS before it will rele
 
 `tdx_pcr08` is computed at registration time from your namespace and KBS certificate. The TDX hardware measurements are stable for a given OSC version — the Makefile already contains the correct values for OSC **1.13.1** (see the `TDX_MR_TD` block near `KATA_RUNTIME_CLASS` in the Makefile).
 
+<details open>
+<summary>Make instructions</summary>
+
+To automatically register RVPS reference values:
+
 ```bash
 NAMESPACE=<your deployment namespace, e.g. seismic-interpretation>
 make setup-attestation NAMESPACE=$NAMESPACE
 ```
 
+</details>
+
 <details>
 <summary>Manual instructions</summary>
 
+To manually register RVPS reference values:
 
 ```bash
 NAMESPACE=<your deployment namespace, e.g. seismic-interpretation>
@@ -1199,15 +1235,22 @@ MODEL_ENCRYPTION_KEY=7f27f40d746b5d92c2d2fe744096b0712ef9951955de9773b3eb20e2be0
 
 > **Note:** This key is intentionally public. The model it protects — a U-Net trained on the Dutch F3 benchmark dataset — is MIT-licensed and not proprietary. The purpose of this quickstart is to demonstrate the attestation and key release mechanism, not to protect a sensitive model. In a real deployment the encryption key must be kept secret.
 
-To register automatically:
+<details open>
+<summary>Make instructions</summary>
+
+To automatically register app-specific KBS secrets:
 
 ```bash
 NAMESPACE=<your deployment namespace, e.g. seismic-interpretation>
 make setup-attestation NAMESPACE=$NAMESPACE
 ```
 
+</details>
+
 <details>
 <summary>Manual instructions</summary>
+
+To manually register app-specific KBS secrets:
 
 The commands build the image verification policy for your namespace and registry, then create (or update) the namespace-scoped Secret in `trustee-operator-system` and register it with KBS. Set `REGISTRY` to match the registry where your images are published, or leave it unset to use the published quickstart images at `quay.io/rh-ai-quickstart`.
 
