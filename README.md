@@ -865,47 +865,6 @@ oc get pods -n nvidia-gpu-operator -w
 # Wait until nvidia-driver-daemonset pods are gone and nvidia-vfio-manager is Running
 ```
 
-**Verify node labels for the `kata-cc-nvidia-gpu` runtime class:**
-
-The `kata-cc-nvidia-gpu` runtimeClass requires all of the following node labels to be present before the scheduler will place a pod on the node (see OSC 1.13 section 4.10.8):
-
-```bash
-GPU_NODE=$(oc get nodes -l nvidia.com/gpu.present=true -o jsonpath='{.items[0].metadata.name}')
-oc get node $GPU_NODE -o json | python3 -c "
-import json, sys
-labels = json.load(sys.stdin)['metadata']['labels']
-required = [
-    ('feature.node.kubernetes.io/runtime.kata',          'Base Kata label'),
-    ('nvidia.com/gpu.present',                           'GPU present'),
-    ('nvidia.com/gpu.deploy.vfio-manager',               'vfio-manager deployed'),
-    ('nvidia.com/gpu.deploy.kata-sandbox-device-plugin', 'Sandbox device plugin deployed'),
-    ('nvidia.com/cc.mode.state',                         'CC mode state (must be: on)'),
-    ('nvidia.com/cc.ready.state',                        'CC mode ready (must be: true)'),
-    ('nvidia.com/gpu.deploy.cc-manager',                 'CC manager deployed'),
-]
-tee_labels = [
-    ('intel.feature.node.kubernetes.io/tdx', 'Intel TDX'),
-    ('amd.feature.node.kubernetes.io/snp',   'AMD SEV-SNP'),
-]
-print('Required labels:')
-for k, desc in required:
-    v = labels.get(k, '(MISSING)')
-    mark = '✓' if v not in ('(MISSING)',) else '✗'
-    print(f'  {mark} {k}: {v}  [{desc}]')
-print('TEE label (one required):')
-for k, desc in tee_labels:
-    v = labels.get(k, '(absent)')
-    mark = '✓' if v != '(absent)' else ' '
-    print(f'  {mark} {k}: {v}  [{desc}]')
-"
-```
-
-**Expected outcome:**
-- ✓ All seven required labels present
-- ✓ `nvidia.com/cc.mode.state: on` — GPU is in NVIDIA Confidential Computing mode
-- ✓ `nvidia.com/cc.ready.state: true` — CC mode initialised and healthy
-- ✓ One of the TEE labels present (`intel.feature.node.kubernetes.io/tdx: true` or `amd.feature.node.kubernetes.io/snp: true`)
-
 If `cc.mode.state` is missing or set to `off`, the GPU is not in CC mode. CC mode requires a supported GPU (H100, H200, B100 or later). Check that the `nvidia-cc-manager` daemonset is running and healthy:
 
 ```bash
@@ -959,6 +918,18 @@ oc wait mcp/master --for=condition=Updated=True --timeout=30m
 Both files create a `KubeletConfig` named `kata-runtime-request-timeout` with `runtimeRequestTimeout: 10m0s` — the only difference is the `machineConfigPoolSelector` (`worker` vs `master`). Applying the wrong one results in the timeout not taking effect and pods failing with `RST_STREAM CANCEL` during image pull. The `make setup-kata` target auto-detects the cluster type by checking for nodes that are workers but not masters, and applies the correct file.
 
 </details>
+
+Verify node labels for the `kata-cc-nvidia-gpu` runtimeClass on all GPU nodes:
+
+```bash
+make validate-node-labels
+```
+
+**Expected outcome:**
+- ✓ All seven required labels present
+- ✓ `nvidia.com/cc.mode.state: on` — GPU is in NVIDIA Confidential Computing mode
+- ✓ `nvidia.com/cc.ready.state: true` — CC mode initialised and healthy
+- ✓ One of the TEE labels present (`intel.feature.node.kubernetes.io/tdx: true` or `amd.feature.node.kubernetes.io/snp: true`)
 
 ---
 

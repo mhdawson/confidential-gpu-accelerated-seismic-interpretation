@@ -124,6 +124,8 @@ help:
 	@echo "                               Patches ClusterPolicy: ccManager on, driver/toolkit/devicePlugin off,"
 	@echo "                               vfioManager on; auto-detects NVSwitch nodes for BIND_NVSWITCHES"
 	@echo "                               Requires setup-kata to have completed first"
+	@echo "    validate-node-labels     - Print required node labels for kata-cc-nvidia-gpu on all GPU nodes"
+	@echo "                               Shows TEE label, CC mode state, vfio-manager, cc-manager status"
 	@echo "    setup-dcap               - Deploy Intel SGX Device Plugin and Intel TDX DCAP Operator (QGS + PCCS)"
 	@echo "                               Required for TDX attestation: QGS listens on vsock port 4050 so"
 	@echo "                               CDH inside kata VMs can generate attestation quotes"
@@ -1022,6 +1024,19 @@ setup-cc-gpu:
 	echo "=== setup-cc-gpu complete ==="; \
 	echo "If cc.mode.state is 'on' and cc.ready.state is 'true', GPU is ready for kata CC workloads."; \
 	echo "Run make setup-dcap next (Intel TDX), or make setup-trustee-in-cluster if DCAP is already configured."
+
+.PHONY: validate-node-labels
+validate-node-labels:
+	@set -e; \
+	echo "=== Node label validation for kata-cc-nvidia-gpu ==="; \
+	GPU_NODES=$$(oc get nodes -l nvidia.com/gpu.present=true --no-headers 2>/dev/null | awk '{print $$1}'); \
+	if [ -z "$$GPU_NODES" ]; then \
+	    echo "No nodes with nvidia.com/gpu.present=true found."; exit 1; \
+	fi; \
+	for GPU_NODE in $$GPU_NODES; do \
+	    echo ""; \
+	    oc get node "$$GPU_NODE" -o json | python3 scripts/validate-node-labels.py; \
+	done
 
 .PHONY: setup-dcap
 setup-dcap:
