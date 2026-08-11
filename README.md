@@ -914,6 +914,12 @@ make validate-node-labels
 - ✓ `nvidia.com/cc.ready.state: true` — CC mode initialised and healthy
 - ✓ One of the TEE labels present (`intel.feature.node.kubernetes.io/tdx: true` or `amd.feature.node.kubernetes.io/snp: true`)
 
+To confirm that GPU passthrough is correctly configured — ClusterPolicy settings, node labels, VFIO/sandbox pods, and `nvidia.com/pgpu` allocatable resources — run:
+
+```bash
+make verify-gpu-passthrough
+```
+
 ---
 
 ### Intel TDX Quote Generation Service setup — application deployer (cluster-admin, once per cluster, Intel TDX only)

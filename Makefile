@@ -124,6 +124,8 @@ help:
 	@echo "                               Patches ClusterPolicy: ccManager on, driver/toolkit/devicePlugin off,"
 	@echo "                               vfioManager on; auto-detects NVSwitch nodes for BIND_NVSWITCHES"
 	@echo "                               Requires setup-kata to have completed first"
+	@echo "    verify-gpu-passthrough   - Check ClusterPolicy settings, node labels, VFIO/sandbox pods,"
+	@echo "                               and pgpu allocatable resources for kata GPU passthrough"
 	@echo "    validate-node-labels     - Print required node labels for kata-cc-nvidia-gpu on all GPU nodes"
 	@echo "                               Shows TEE label, CC mode state, vfio-manager, cc-manager status"
 	@echo "    setup-dcap               - Deploy Intel SGX Device Plugin and Intel TDX DCAP Operator (QGS + PCCS)"
@@ -1024,6 +1026,161 @@ setup-cc-gpu:
 	echo "=== setup-cc-gpu complete ==="; \
 	echo "If cc.mode.state is 'on' and cc.ready.state is 'true', GPU is ready for kata CC workloads."; \
 	echo "Run make setup-dcap next (Intel TDX), or make setup-trustee-in-cluster if DCAP is already configured."
+
+.PHONY: verify-gpu-passthrough
+verify-gpu-passthrough:
+	@PASS=0; FAIL=0; WARN=0; \
+	ok()   { echo "  [PASS] $$1"; PASS=$$((PASS+1)); }; \
+	fail() { echo "  [FAIL] $$1"; FAIL=$$((FAIL+1)); }; \
+	warn() { echo "  [WARN] $$1"; WARN=$$((WARN+1)); }; \
+	\
+	echo ""; \
+	echo "=== ClusterPolicy settings ==="; \
+	CP_JSON=$$(oc get clusterpolicy gpu-cluster-policy -o json 2>/dev/null); \
+	if [ -z "$$CP_JSON" ]; then \
+	    fail "ClusterPolicy gpu-cluster-policy not found"; \
+	    echo "       Hint: install the NVIDIA GPU Operator via OperatorHub first."; \
+	else \
+	    SW_ENABLED=$$(echo "$$CP_JSON" | python3 -c "import json,sys; d=json.load(sys.stdin); print(str(d.get('spec',{}).get('sandboxWorkloads',{}).get('enabled',False)).lower())"); \
+	    if [ "$$SW_ENABLED" = "true" ]; then \
+	        ok "sandboxWorkloads.enabled = true"; \
+	    else \
+	        fail "sandboxWorkloads.enabled is not true"; \
+	        echo "       Hint: run: make setup-gpu-passthrough GPU_PASSTHROUGH_NODES=\"<node1> <node2>\""; \
+	    fi; \
+	    \
+	    VFIO_ENABLED=$$(echo "$$CP_JSON" | python3 -c "import json,sys; d=json.load(sys.stdin); print(str(d.get('spec',{}).get('vfioManager',{}).get('enabled',False)).lower())"); \
+	    if [ "$$VFIO_ENABLED" = "true" ]; then \
+	        ok "vfioManager.enabled = true"; \
+	    else \
+	        fail "vfioManager.enabled is not true — VFIO manager must be enabled for GPU passthrough"; \
+	        echo "       Hint: oc patch clusterpolicy gpu-cluster-policy --type merge -p '{\"spec\":{\"vfioManager\":{\"enabled\":true}}}'"; \
+	    fi; \
+	    \
+	    CC_ENABLED=$$(echo "$$CP_JSON" | python3 -c "import json,sys; d=json.load(sys.stdin); print(str(d.get('spec',{}).get('ccManager',{}).get('enabled',False)).lower())"); \
+	    if [ "$$CC_ENABLED" = "true" ]; then \
+	        ok "ccManager.enabled = true"; \
+	    else \
+	        fail "ccManager.enabled is not true — CC manager is required for confidential containers"; \
+	        echo "       Hint: oc patch clusterpolicy gpu-cluster-policy --type merge -p '{\"spec\":{\"ccManager\":{\"enabled\":true}}}'"; \
+	    fi; \
+	    \
+	    DP_ENABLED=$$(echo "$$CP_JSON" | python3 -c "import json,sys; d=json.load(sys.stdin); print(str(d.get('spec',{}).get('devicePlugin',{}).get('enabled',True)).lower())"); \
+	    if [ "$$DP_ENABLED" = "false" ]; then \
+	        ok "devicePlugin.enabled = false"; \
+	    else \
+	        fail "devicePlugin.enabled is true — must be false (conflicts with sandbox device plugin)"; \
+	        echo "       Hint: oc patch clusterpolicy gpu-cluster-policy --type merge -p '{\"spec\":{\"devicePlugin\":{\"enabled\":false}}}'"; \
+	    fi; \
+	    \
+	    DRV_ENABLED=$$(echo "$$CP_JSON" | python3 -c "import json,sys; d=json.load(sys.stdin); print(str(d.get('spec',{}).get('driver',{}).get('enabled',True)).lower())"); \
+	    if [ "$$DRV_ENABLED" = "false" ]; then \
+	        ok "driver.enabled = false"; \
+	    else \
+	        fail "driver.enabled is true — must be false (driver runs inside kata VM, not on host)"; \
+	        echo "       Hint: oc patch clusterpolicy gpu-cluster-policy --type merge -p '{\"spec\":{\"driver\":{\"enabled\":false}}}'"; \
+	    fi; \
+	    \
+	    TK_ENABLED=$$(echo "$$CP_JSON" | python3 -c "import json,sys; d=json.load(sys.stdin); print(str(d.get('spec',{}).get('toolkit',{}).get('enabled',True)).lower())"); \
+	    if [ "$$TK_ENABLED" = "false" ]; then \
+	        ok "toolkit.enabled = false"; \
+	    else \
+	        fail "toolkit.enabled is true — must be false (not needed for passthrough)"; \
+	        echo "       Hint: oc patch clusterpolicy gpu-cluster-policy --type merge -p '{\"spec\":{\"toolkit\":{\"enabled\":false}}}'"; \
+	    fi; \
+	fi; \
+	\
+	echo ""; \
+	echo "=== Node labels ==="; \
+	GPU_NODES=$$(oc get nodes -l nvidia.com/gpu.present=true \
+	    -o jsonpath='{.items[*].metadata.name}' 2>/dev/null); \
+	if [ -z "$$GPU_NODES" ]; then \
+	    fail "No nodes with nvidia.com/gpu.present=true found"; \
+	else \
+	    for NODE in $$GPU_NODES; do \
+	        WL_CONFIG=$$(oc get node "$$NODE" \
+	            -o jsonpath='{.metadata.labels.nvidia\.com/gpu\.workload\.config}' 2>/dev/null); \
+	        if [ "$$WL_CONFIG" = "vm-passthrough" ]; then \
+	            ok "$$NODE: nvidia.com/gpu.workload.config=vm-passthrough"; \
+	        elif [ -n "$$WL_CONFIG" ]; then \
+	            warn "$$NODE: nvidia.com/gpu.workload.config=$$WL_CONFIG (expected vm-passthrough)"; \
+	            echo "       Hint: make setup-gpu-passthrough GPU_PASSTHROUGH_NODES=\"$$NODE\""; \
+	        else \
+	            fail "$$NODE: nvidia.com/gpu.workload.config label not set"; \
+	            echo "       Hint: make setup-gpu-passthrough GPU_PASSTHROUGH_NODES=\"$$NODE\""; \
+	        fi; \
+	    done; \
+	fi; \
+	\
+	echo ""; \
+	echo "=== Key pods (nvidia-gpu-operator namespace) ==="; \
+	VFIO_PODS=$$(oc get pods -n nvidia-gpu-operator 2>/dev/null \
+	    | grep -i "vfio-manager" | grep -c "Running" || true); \
+	[ -z "$$VFIO_PODS" ] && VFIO_PODS=0; \
+	if [ "$$VFIO_PODS" -gt 0 ]; then \
+	    ok "VFIO manager: $$VFIO_PODS pod(s) Running"; \
+	else \
+	    fail "VFIO manager: no Running pods"; \
+	    echo "       Hint: oc get pods -n nvidia-gpu-operator | grep vfio"; \
+	    echo "              If missing, verify driver.enabled=false in ClusterPolicy."; \
+	fi; \
+	\
+	SDP_PODS=$$(oc get pods -n nvidia-gpu-operator 2>/dev/null \
+	    | grep -i "sandbox-device-plugin" | grep -c "Running" || true); \
+	[ -z "$$SDP_PODS" ] && SDP_PODS=0; \
+	if [ "$$SDP_PODS" -gt 0 ]; then \
+	    ok "Sandbox device plugin: $$SDP_PODS pod(s) Running"; \
+	else \
+	    fail "Sandbox device plugin: no Running pods — nvidia.com/pgpu will not be advertised"; \
+	    echo "       Hint: oc get pods -n nvidia-gpu-operator | grep sandbox"; \
+	fi; \
+	\
+	CC_PODS=$$(oc get pods -n nvidia-gpu-operator 2>/dev/null \
+	    | grep -i "cc-manager" | grep -c "Running" || true); \
+	[ -z "$$CC_PODS" ] && CC_PODS=0; \
+	if [ "$$CC_PODS" -gt 0 ]; then \
+	    ok "CC manager: $$CC_PODS pod(s) Running"; \
+	else \
+	    warn "CC manager: no Running pods — needed for GPU attestation inside kata VM"; \
+	    echo "       Hint: oc get pods -n nvidia-gpu-operator | grep cc-manager"; \
+	fi; \
+	\
+	echo ""; \
+	echo "=== pgpu allocatable resources ==="; \
+	PGPU_FOUND=false; \
+	for NODE in $$GPU_NODES; do \
+	    WL_CONFIG=$$(oc get node "$$NODE" \
+	        -o jsonpath='{.metadata.labels.nvidia\.com/gpu\.workload\.config}' 2>/dev/null); \
+	    if [ "$$WL_CONFIG" = "vm-passthrough" ]; then \
+	        PGPU_COUNT=$$(oc get node "$$NODE" \
+	            -o jsonpath='{.status.allocatable.nvidia\.com/pgpu}' 2>/dev/null); \
+	        if [ -n "$$PGPU_COUNT" ] && [ "$$PGPU_COUNT" != "0" ]; then \
+	            ok "$$NODE: nvidia.com/pgpu = $$PGPU_COUNT allocatable"; \
+	            PGPU_FOUND=true; \
+	        else \
+	            fail "$$NODE: nvidia.com/pgpu is 0 or not reported"; \
+	            echo "       Hint: sandbox device plugin may not be running or has not re-registered."; \
+	            echo "              oc get pods -n nvidia-gpu-operator | grep sandbox-device-plugin"; \
+	        fi; \
+	    fi; \
+	done; \
+	if [ "$$PGPU_FOUND" = "false" ] && [ -n "$$GPU_NODES" ]; then \
+	    fail "No nodes have nvidia.com/pgpu allocatable — pods requesting pgpu will stay Pending"; \
+	    echo "       Hint: make setup-gpu-passthrough GPU_PASSTHROUGH_NODES=\"<node1> <node2>\""; \
+	fi; \
+	\
+	echo ""; \
+	echo "=== Summary ==="; \
+	echo "  PASS: $$PASS   FAIL: $$FAIL   WARN: $$WARN"; \
+	echo ""; \
+	if [ "$$FAIL" -gt 0 ]; then \
+	    echo "  GPU passthrough is NOT correctly configured. Fix FAIL items above."; \
+	    exit 1; \
+	elif [ "$$WARN" -gt 0 ]; then \
+	    echo "  GPU passthrough is mostly configured. Review WARN items above."; \
+	else \
+	    echo "  GPU passthrough is correctly configured. Ready for: make install"; \
+	fi
 
 .PHONY: validate-node-labels
 validate-node-labels:
