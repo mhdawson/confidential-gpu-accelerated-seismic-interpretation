@@ -1245,119 +1245,119 @@ of safety.
  RVPS REFERENCE VALUES
 ========================================================================
 
-?? Would be registered by 'make set-rvps-values' =====================
+── Would be registered by 'make set-rvps-values' ─────────────────────
 
-  ?  tdx_pcr08       initdata configuration binding
+  ✓  tdx_pcr08       initdata configuration binding
                    SHA256(zeroes32 || SHA256(initdata_toml_bytes))
                    changes: KBS TLS cert rotates (cert-manager);
                    namespace changes; policy mode changes; KBS URL
                    changes
-                   action: make setup-attestation ? re-run whenever
+                   action: make set-rvps-values — re-run whenever
                    'make install' would produce a different initdata
                    blob
                    3b24f5e8ab27de570ae1319f2529e1f4be2a5ffd1daf1ebc5da59ae977aa107c
 
-  ?  mr_td           TDVF guest firmware (OVMF)
+  ✓  mr_td           TDVF guest firmware (OVMF)
                    measurement of the OVMF firmware pages loaded into the TD at creation
                    changes: OSC upgrade that updates the kata TDVF/OVMF
                    binary
                    action: make collect-tdx-measurements, then make
-                   setup-attestation
+                   set-rvps-values
                    27fb849fb05653add8be4b8c5b2793e66d1e25773a5c6f80dabbc10a5cb18bc40b7d5caaaf299e3a200f7018cdaa6f74
 
-  ?  xfam            CPU extended feature mask
+  ✓  xfam            CPU extended feature mask
                    QEMU CPU feature flags exposed to the TD (AVX, AMX, etc.)
-                   changes: very rarely ? only if QEMU CPU model or OSC
+                   changes: very rarely — only if QEMU CPU model or OSC
                    QEMU config changes
                    action: make collect-tdx-measurements, then make
-                   setup-attestation
+                   set-rvps-values
                    e702060000000000
 
-  ?  rtmr_0          TDVF boot handoff measurement
+  ✓  rtmr_0          TDVF boot handoff measurement
                    extended by TDVF before handing off to the bootloader/kernel
                    changes: OSC upgrade that updates TDVF; same cadence
                    as mr_td
                    action: make collect-tdx-measurements, then make
-                   setup-attestation
+                   set-rvps-values
                    01cbbe9a7adb5f1f9459085d6f9f4bd02a5bf5352a8287b4ba963b35bc3f022c571fde23d04cb485acb4733f09b53493
 
-  ?  rtmr_1          kata guest kernel + command line
+  ✓  rtmr_1          kata guest kernel + command line
                    extended by the bootloader with the kernel image and cmdline
                    changes: OSC upgrade that updates the kata guest
                    kernel
                    action: make collect-tdx-measurements, then make
-                   setup-attestation
+                   set-rvps-values
                    93a576941cfe92d6427106944e475e96b702d1049975b6c64512345857d69dbab8d14c5f3dc88931cc582c9974fae8cc
 
-  ?  rtmr_2          kata guest initrd (kata-agent, CDH, AA)
+  ✓  rtmr_2          kata guest initrd (kata-agent, CDH, AA)
                    extended with the initrd containing the kata guest components
                    changes: OSC upgrade that updates kata-agent, CDH, or
                    AA in the initrd
                    action: make collect-tdx-measurements, then make
-                   setup-attestation
+                   set-rvps-values
                    e882c8d18de74cc30d506d56962e5d3eb33c98e6c25f0329857c29f03a48fb17b6c6b1e2acc4741b305a6656a5f7d6c9
 
-  ?  rtmr_3          post-boot guest measurements
+  ✓  rtmr_3          post-boot guest measurements
                    reserved for guest OS runtime use; typically all-zeros in kata-cc
                    changes: only if kata-cc begins using RTMR[3] for
                    runtime measurements
                    action: make collect-tdx-measurements, then make
-                   setup-attestation
+                   set-rvps-values
                    000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 
-  ?  td_attributes   TD attribute flags
-                   bit 0 = debug mode ? must be 0 for a confidential production workload
+  ✓  td_attributes   TD attribute flags
+                   bit 0 = debug mode — must be 0 for a confidential production workload
                    changes: only if QEMU/kata configuration enables or
                    disables debug mode
                    action: make collect-tdx-measurements, then make
-                   setup-attestation; verify bit 0 is 0 before
+                   set-rvps-values; verify bit 0 is 0 before
                    registering
                    0000001000000000
 
-  ?  mr_seam         Intel TDX module version
+  ✗  mr_seam         Intel TDX module version
                    measurement of the Intel TDX module running on the host CPU
                    changes: host firmware update that upgrades the Intel
                    TDX module (independent of OSC upgrades)
                    action: make collect-tdx-measurements, then make
-                   setup-attestation
+                   set-rvps-values
                    NOTE: export TDX_MR_SEAM from scripts/collect-tdx-measurements.sh
 
 
-?? Currently registered in trustee-operator-system =====================
+── Currently registered in trustee-operator-system ───────────────────
 
-  ?  tdx_pcr08       initdata configuration binding
+  ✓  tdx_pcr08       initdata configuration binding
                    1 values  expires 2099-12-31T00:00:00Z
-    [21]  3b24f5e8ab27de570ae1319f2529e1f4be2a5ffd1daf1ebc5da59ae977aa107c  ? matches computed
+    [21]  3b24f5e8ab27de570ae1319f2529e1f4be2a5ffd1daf1ebc5da59ae977aa107c  ✓ matches computed
 
-  ?  mr_td           TDVF guest firmware (OVMF)
+  ✓  mr_td           TDVF guest firmware (OVMF)
                    1 value  expires 2099-12-31T00:00:00Z
-    [1]  27fb849fb05653add8be4b8c5b2793e66d1e25773a5c6f80dabbc10a5cb18bc40b7d5caaaf299e3a200f7018cdaa6f74  ? matches computed
+    [1]  27fb849fb05653add8be4b8c5b2793e66d1e25773a5c6f80dabbc10a5cb18bc40b7d5caaaf299e3a200f7018cdaa6f74  ✓ matches computed
 
-  ?  xfam            CPU extended feature mask
+  ✓  xfam            CPU extended feature mask
                    1 value  expires 2099-12-31T00:00:00Z
-    [1]  e702060000000000  ? matches computed
+    [1]  e702060000000000  ✓ matches computed
 
-  ?  rtmr_0          TDVF boot handoff measurement
+  ✓  rtmr_0          TDVF boot handoff measurement
                    1 value  expires 2099-12-31T00:00:00Z
-    [1]  01cbbe9a7adb5f1f9459085d6f9f4bd02a5bf5352a8287b4ba963b35bc3f022c571fde23d04cb485acb4733f09b53493  ? matches computed
+    [1]  01cbbe9a7adb5f1f9459085d6f9f4bd02a5bf5352a8287b4ba963b35bc3f022c571fde23d04cb485acb4733f09b53493  ✓ matches computed
 
-  ?  rtmr_1          kata guest kernel + command line
+  ✓  rtmr_1          kata guest kernel + command line
                    1 value  expires 2099-12-31T00:00:00Z
-    [1]  93a576941cfe92d6427106944e475e96b702d1049975b6c64512345857d69dbab8d14c5f3dc88931cc582c9974fae8cc  ? matches computed
+    [1]  93a576941cfe92d6427106944e475e96b702d1049975b6c64512345857d69dbab8d14c5f3dc88931cc582c9974fae8cc  ✓ matches computed
 
-  ?  rtmr_2          kata guest initrd (kata-agent, CDH, AA)
+  ✓  rtmr_2          kata guest initrd (kata-agent, CDH, AA)
                    1 value  expires 2099-12-31T00:00:00Z
-    [1]  e882c8d18de74cc30d506d56962e5d3eb33c98e6c25f0329857c29f03a48fb17b6c6b1e2acc4741b305a6656a5f7d6c9  ? matches computed
+    [1]  e882c8d18de74cc30d506d56962e5d3eb33c98e6c25f0329857c29f03a48fb17b6c6b1e2acc4741b305a6656a5f7d6c9  ✓ matches computed
 
-  ?  rtmr_3          post-boot guest measurements
+  ✓  rtmr_3          post-boot guest measurements
                    1 value  expires 2099-12-31T00:00:00Z
-    [1]  000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000  ? matches computed
+    [1]  000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000  ✓ matches computed
 
-  ?  td_attributes   TD attribute flags
+  ✓  td_attributes   TD attribute flags
                    1 value  expires 2099-12-31T00:00:00Z
-    [1]  0000001000000000  ? matches computed
+    [1]  0000001000000000  ✓ matches computed
 
-  ?  mr_seam         Intel TDX module version
+  ✗  mr_seam         Intel TDX module version
                    not registered in configmap
 
 
