@@ -1925,7 +1925,9 @@ Try the same through the OpenShift web console:
 3. Select the **Terminal** tab
 
 **Expected outcome:**
-- The terminal fails to connect and displays: `"Failed to connect: ExecProcessRequest is not permitted"`
+- The terminal fails to connect and displays: `"ExecProcessRequest is blocked by policy"`
+
+![Terminal denied](docs/images/terminal-denied.png)
 
 This confirms that the Kata agent exec-deny policy prevents anyone — including cluster administrators — from injecting a shell or additional process into the running container. The only code that runs inside the Trust Domain is the cosign-signed app image that passed the KBS attestation check.
 
