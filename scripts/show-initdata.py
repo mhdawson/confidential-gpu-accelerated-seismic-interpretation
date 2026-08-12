@@ -92,7 +92,7 @@ version = "0.1.0"
 
 toml_bytes   = toml.encode()
 toml_hash    = hashlib.sha256(toml_bytes).hexdigest()
-pcr8         = hashlib.sha256(bytes(32) + hashlib.sha256(toml_bytes).digest()).hexdigest()
+mr_config_id = (hashlib.sha256(toml_bytes).digest() + bytes(16)).hex()
 encoded      = base64.b64encode(gzip.compress(toml_bytes)).decode()
 encoded_kb   = len(encoded) / 1024
 
@@ -116,6 +116,6 @@ for section_name, content in [("aa.toml", aa_toml), ("cdh.toml", cdh_toml), ("po
 
 print(rule())
 print(f"  TOML SHA-256 : {toml_hash}")
-print(f"  PCR8 (RVPS)  : {pcr8}")
+print(f"  mr_config_id : {mr_config_id}")
 print(f"  Encoded size : {encoded_kb:.1f} KB  ({len(encoded)} chars base64)")
 print(rule())

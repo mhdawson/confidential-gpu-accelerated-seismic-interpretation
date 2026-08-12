@@ -7,9 +7,9 @@ stores a JSON object where each measurement name maps to a base64-encoded entry:
 
   {"name": "mr_td", "expiration": "2099-12-31T00:00:00Z", "value": ["hex..."]}
 
-Usage: update-rvps.py <current_json> <pcr8_value>
-  current_json  - existing JSON content of the reference_value key ({} if empty)
-  pcr8_value    - computed tdx_pcr08 hex string for the current namespace/initdata
+Usage: update-rvps.py <current_json> <mr_config_id_value>
+  current_json        - existing JSON content of the reference_value key ({} if empty)
+  mr_config_id_value  - computed mr_config_id hex string for the current namespace/initdata
 
 TDX hardware measurements are read from the environment:
   TDX_MR_TD   - OVMF firmware measurement
@@ -57,10 +57,10 @@ def upsert(entries, name, value):
 
 
 if len(sys.argv) != 3:
-    print(f"Usage: {sys.argv[0]} <current_json> <pcr8_value>", file=sys.stderr)
+    print(f"Usage: {sys.argv[0]} <current_json> <mr_config_id_value>", file=sys.stderr)
     sys.exit(1)
 
-current_json, pcr8 = sys.argv[1], sys.argv[2]
+current_json, mr_config_id = sys.argv[1], sys.argv[2]
 
 entries = {}
 if current_json.strip() and current_json.strip() != '{}':
@@ -69,7 +69,7 @@ if current_json.strip() and current_json.strip() != '{}':
     except Exception:
         entries = {}
 
-upsert(entries, 'tdx_pcr08',    pcr8)
+upsert(entries, 'mr_config_id', mr_config_id)
 upsert(entries, 'mr_td',        os.environ.get('TDX_MR_TD', ''))
 upsert(entries, 'xfam',         os.environ.get('TDX_XFAM', ''))
 upsert(entries, 'rtmr_0',       os.environ.get('TDX_RTMR_0', ''))

@@ -25,7 +25,8 @@ AI-powered classification from North Sea seismic data — running with a three-f
   - [Intel TDX Quote Generation Service setup — application deployer (cluster-admin, once per cluster, Intel TDX only)](#intel-tdx-quote-generation-service-setup--application-deployer-cluster-admin-once-per-cluster-intel-tdx-only)
   - [Trustee setup — model owner (cluster-admin, once per cluster)](#trustee-setup--model-owner-cluster-admin-once-per-cluster)
     - [Install Trustee](#install-trustee)
-    - [Patch default CPU policy](#patch-default-cpu-policy)
+    - [Patch default CPU policy to enforce initdata validation](#patch-default-cpu-policy-to-enforce-initdata-validation)
+    - [Patch default CPU policy to allow older firmware versions](#patch-default-cpu-policy-to-allow-older-firmware-versions)
     - [Register RVPS reference values](#register-rvps-reference-values)
     - [Register app-specific secrets with KBS](#register-app-specific-secrets-with-kbs)
   - [Application deployment — application deployer (namespace admin)](#application-deployment--application-deployer-namespace-admin)
@@ -1117,7 +1118,41 @@ oc annotate route kbs-route -n trustee-operator-system \
 
 </details>
 
-#### Patch default CPU policy
+#### Patch default CPU policy to enforce initdata validation
+
+The default Trustee CPU attestation policy verifies that the initdata provided with each attestation request is self-consistent with the TDX quote (i.e. `SHA256(initdata) == mr_config_id` in the quote). This binding check ensures the initdata was not tampered with in transit, but it does not verify that the initdata has any specific expected content. Without this patch, a pod that omits the exec-deny policy or uses a different KBS URL would still pass the configuration check and receive the model key.
+
+This patch adds one line to the `configuration` block of the CPU attestation policy:
+
+```rego
+input.tdx.quote.body.mr_config_id in query_reference_value("mr_config_id")
+```
+
+This requires that the `mr_config_id` value in the pod's TDX quote — which encodes the exact initdata the pod was launched with — matches one of the values registered in RVPS by `make set-rvps-values`. Any pod with different initdata (different KBS URL, certificate, namespace, or exec-deny policy) will fail the configuration check and be denied the key.
+
+`mr_config_id` must be registered in RVPS before applying this patch (run `make set-rvps-values` first), otherwise every pod will fail the configuration check.
+
+<details open>
+<summary>Make instructions</summary>
+
+```bash
+make patch-cpu-policy-initdata
+```
+
+</details>
+
+<details>
+<summary>Manual instructions</summary>
+
+```bash
+python3 attestation-policies/patch-cpu-mr-config-id.py | oc apply -f -
+oc rollout restart deployment/trustee-deployment -n trustee-operator-system
+oc rollout status deployment/trustee-deployment -n trustee-operator-system --timeout=2m
+```
+
+</details>
+
+#### Patch default CPU policy to allow older firmware versions
 
 The default Trustee CPU attestation policy requires `tcb_status == "UpToDate"` before it will set the hardware trustworthiness claim to affirming and release the model key. In practice, Intel issues TCB Recovery events on an irregular schedule, and a platform whose TCB was fully up to date when this quickstart was written may show `OutOfDate` by the time you run it because a newer TCB version has been published since the platform was last updated. In production this default makes sense, but for the quickstart we chose to patch the policy to allow TCB versions after a fixed date in order to minimize the chances you need to upgrade your firmware to run the quickstart.
 
@@ -1129,7 +1164,7 @@ The patched policy replaces the `UpToDate` requirement with a minimum acceptable
 <summary>Make instructions</summary>
 
 ```bash
-make patch-cpu-policy
+make patch-cpu-policy-firmwarelevel
 ```
 
 </details>
@@ -1151,7 +1186,7 @@ The attestation policy requires the following values in RVPS before it will rele
 
 | Name | What it covers | Varies by |
 |---|---|---|
-| `tdx_pcr08` | Initdata hash — binds the pod to the KBS URL, KBS TLS cert, namespace, image repos, and exec-deny policy | Namespace, KBS cert, app/model image repos, policy mode |
+| `mr_config_id` | Initdata hash — binds the pod to the KBS URL, KBS TLS cert, namespace, image repos, and exec-deny policy | Namespace, KBS cert, app/model image repos, policy mode |
 | `td_attributes` | TDX TD feature flags (e.g. debug mode disabled) | Hardware / OSC version |
 | `mr_td` | OVMF firmware measurement | OSC version |
 | `xfam` | QEMU CPU feature mask | OSC version / runtime class |
@@ -1160,7 +1195,7 @@ The attestation policy requires the following values in RVPS before it will rele
 | `rtmr_2` | Additional boot measurement | OSC version |
 | `rtmr_3` | Runtime configuration measurement | OSC version |
 
-`tdx_pcr08` is computed at registration time from the full initdata blob: it covers the KBS URL, KBS TLS certificate, namespace, app and model image repos, and the exec-deny policy (policy.rego). Any change to any of these requires re-running `make set-rvps-values`. The TDX hardware measurements are stable for a given OSC version — the Makefile already contains the correct values for OSC **1.13.1** (see the `TDX_MR_TD` block near `KATA_RUNTIME_CLASS` in the Makefile).
+`mr_config_id` is computed at registration time from the full initdata blob: it covers the KBS URL, KBS TLS certificate, namespace, app and model image repos, and the exec-deny policy (policy.rego). Any change to any of these requires re-running `make set-rvps-values`. The TDX hardware measurements are stable for a given OSC version — the Makefile already contains the correct values for OSC **1.13.1** (see the `TDX_MR_TD` block near `KATA_RUNTIME_CLASS` in the Makefile).
 
 <details open>
 <summary>Make instructions</summary>
@@ -1185,13 +1220,13 @@ MODEL_IMG=$REGISTRY/conf-gpu-accel-seismic-interp-deepseismic-model
 KBS_CERT=$(oc get secret trusteeconfig-https-cert-secret -n trustee-operator-system \
     -o jsonpath='{.data.certificate}' | base64 -d)
 POLICY_MODE=${POLICY_MODE:-locked}
-PCR8=$(echo "$KBS_CERT" | python3 scripts/build-initdata.py \
+MR_CONFIG_ID=$(echo "$KBS_CERT" | python3 scripts/build-initdata.py \
     "https://kbs-service.trustee-operator-system.svc.cluster.local:8080" \
-    "$NAMESPACE" --pcr8-only \
+    "$NAMESPACE" --mr-config-id \
     --policy-mode "$POLICY_MODE" \
     --app-image "$APP_IMG" \
     --model-image "$MODEL_IMG")
-echo "tdx_pcr08: $PCR8"
+echo "mr_config_id: $MR_CONFIG_ID"
 
 # TDX hardware reference values for OSC 1.13.1 / kata-cc-nvidia-gpu.
 # If you are running a different OSC version, see the note below.
@@ -1203,12 +1238,12 @@ TDX_RTMR_1=93a576941cfe92d6427106944e475e96b702d1049975b6c64512345857d69dbab8d14
 TDX_RTMR_2=e882c8d18de74cc30d506d56962e5d3eb33c98e6c25f0329857c29f03a48fb17b6c6b1e2acc4741b305a6656a5f7d6c9
 TDX_RTMR_3=000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 
-# Running for a second namespace adds that namespace's tdx_pcr08 without
-# removing existing values — each namespace has a distinct PCR8.
+# Running for a second namespace adds that namespace's mr_config_id without
+# removing existing values — each namespace has a distinct mr_config_id.
 CURRENT_REF=$(oc get configmap trusteeconfig-rvps-reference-values -n trustee-operator-system -o jsonpath='{.data.reference_value}' 2>/dev/null || echo '{}')
 NEW_REF=$(TDX_TD_ATTRIBUTES=$TDX_TD_ATTRIBUTES TDX_MR_TD=$TDX_MR_TD TDX_XFAM=$TDX_XFAM \
     TDX_RTMR_0=$TDX_RTMR_0 TDX_RTMR_1=$TDX_RTMR_1 TDX_RTMR_2=$TDX_RTMR_2 TDX_RTMR_3=$TDX_RTMR_3 \
-    python3 scripts/update-rvps.py "$CURRENT_REF" "$PCR8")
+    python3 scripts/update-rvps.py "$CURRENT_REF" "$MR_CONFIG_ID")
 PATCH=$(echo "$NEW_REF" | python3 -c 'import json,sys; print(json.dumps({"data":{"reference_value":sys.stdin.read().strip()}}))')
 oc patch configmap trusteeconfig-rvps-reference-values -n trustee-operator-system --type merge -p "$PATCH"
 oc rollout restart deployment/trustee-deployment -n trustee-operator-system
@@ -1247,15 +1282,15 @@ of safety.
 
 ── Would be registered by 'make set-rvps-values' ─────────────────────
 
-  ✓  tdx_pcr08       initdata configuration binding
-                   SHA256(zeroes32 || SHA256(initdata_toml_bytes))
+  ✓  mr_config_id    initdata configuration binding
+                   SHA256(initdata_toml_bytes) zero-padded to 48 bytes (96 hex chars)
                    changes: KBS TLS cert rotates (cert-manager);
                    namespace changes; policy mode changes; KBS URL
                    changes
                    action: make set-rvps-values — re-run whenever
                    'make install' would produce a different initdata
                    blob
-                   3b24f5e8ab27de570ae1319f2529e1f4be2a5ffd1daf1ebc5da59ae977aa107c
+                   3b24f5e8ab27de570ae1319f2529e1f4be2a5ffd1daf1ebc5da59ae977aa10700000000000000000000000000000000
 
   ✓  mr_td           TDVF guest firmware (OVMF)
                    measurement of the OVMF firmware pages loaded into the TD at creation
@@ -1325,9 +1360,9 @@ of safety.
 
 ── Currently registered in trustee-operator-system ───────────────────
 
-  ✓  tdx_pcr08       initdata configuration binding
-                   1 values  expires 2099-12-31T00:00:00Z
-    [21]  3b24f5e8ab27de570ae1319f2529e1f4be2a5ffd1daf1ebc5da59ae977aa107c  ✓ matches computed
+  ✓  mr_config_id    initdata configuration binding
+                   1 value  expires 2099-12-31T00:00:00Z
+    [1]  3b24f5e8ab27de570ae1319f2529e1f4be2a5ffd1daf1ebc5da59ae977aa10700000000000000000000000000000000  ✓ matches computed
 
   ✓  mr_td           TDVF guest firmware (OVMF)
                    1 value  expires 2099-12-31T00:00:00Z
@@ -1375,9 +1410,7 @@ the set of allowed rvps values you can run:
 make clear-rvps NAMESPACE=$NAMESPACE
 ```
 
-`tdx_pcr08` is a hash of the initdata for the KBS to release a key one of the registered rvps sets must
-match including the tdx_pcr08 with the hash of the initdata used when the pod was started. You can view the
-itdata that will be set when you deploy the application by running:
+`mr_config_id` is a hash of the initdata — for the KBS to release a key, one of the registered RVPS sets must match including the `mr_config_id` with the hash of the initdata used when the pod was started. You can view the initdata that will be set when you deploy the application by running:
 
 ```
 make show-initdata NAMESPACE=$NAMESPACE
@@ -1602,7 +1635,7 @@ policy_data := {
 
 ========================================================================
   TOML SHA-256 : 58dd4bdd362f5ab68acc46e3653f9ac849f6292f74f6523e2770e963d38b1670
-  PCR8 (RVPS)  : 3b24f5e8ab27de570ae1319f2529e1f4be2a5ffd1daf1ebc5da59ae977aa107c
+  mr_config_id : 58dd4bdd362f5ab68acc46e3653f9ac849f6292f74f6523e2770e963d38b167000000000000000000000000000000000
   Encoded size : 3.7 KB  (3808 chars base64)
 ========================================================================
 

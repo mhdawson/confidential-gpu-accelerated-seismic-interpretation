@@ -140,20 +140,21 @@ help:
 	@echo "                               measurements (mr_td, xfam, rtmr_0-3, td_attributes, mr_seam)"
 	@echo "                               Paste the printed Makefile variables here; re-run after OSC upgrades"
 	@echo "                               (requires NAMESPACE; uses KATA_RUNTIME_CLASS)"
-	@echo "    set-rvps-values          - Compute and register tdx_pcr08 and TDX hardware measurements in RVPS;"
+	@echo "    set-rvps-values          - Compute and register mr_config_id and TDX hardware measurements in RVPS;"
 	@echo "                               restarts Trustee to pick up the updated configmap"
 	@echo "                               (requires NAMESPACE; export TDX_MR_TD/XFAM/RTMR_* for full attestation)"
 	@echo "    register-secrets-with-kbs - Register model key, cosign key, and image policy with KBS"
 	@echo "                               via kbsSecretResources (requires NAMESPACE, MODEL_ENCRYPTION_KEY,"
 	@echo "                               model-owner-verification-keys/cosign.pub)"
-	@echo "    patch-cpu-policy         - Apply the quickstart CPU attestation policy (date-based TCB check instead"
+	@echo "    patch-cpu-policy-initdata       - Add initdata binding to the CPU attestation policy (mr_config_id check); restarts Trustee"
+	@echo "    patch-cpu-policy-firmwarelevel         - Apply the quickstart CPU attestation policy (date-based TCB check instead"
 	@echo "                               of requiring UpToDate TCB status); restarts Trustee"
 	@echo "    setup-attestation        - Convenience target: runs set-rvps-values then register-secrets-with-kbs"
 	@echo "    validate-trustee-certificate - Verify the cert in trusteeconfig-https-cert-secret matches what"
 	@echo "                               KBS is currently serving; fails if cert-manager has rotated the cert"
 	@echo "                               since the last 'make install' (which would break TLS in the kata VM)"
 	@echo "    show-initdata            - Print the decoded initdata that would be embedded in the pod:"
-	@echo "                               aa.toml, cdh.toml, policy.rego, SHA-256, and PCR8 hash"
+	@echo "                               aa.toml, cdh.toml, policy.rego, SHA-256, and mr_config_id"
 	@echo "                               (requires NAMESPACE; uses POLICY_MODE, APP_IMG, MODEL_IMG)"
 	@echo "    show-rvps                - Print RVPS reference values: what would be registered by"
 	@echo "                               set-rvps-values vs what is currently in the ConfigMap"
@@ -1406,21 +1407,21 @@ set-rvps-values:
 	@[ -n "$$NAMESPACE" ] || (echo "Error: NAMESPACE is not set"; exit 1)
 	@if [ -z "$(TDX_MR_TD)" ]; then \
 	    echo "WARNING: TDX hardware measurements are not set."; \
-	    echo "         Only tdx_pcr08 will be registered — attestation will fail until"; \
+	    echo "         Only mr_config_id will be registered — attestation will fail until"; \
 	    echo "         you run scripts/collect-tdx-measurements.sh, export the printed"; \
 	    echo "         values, and re-run 'make set-rvps-values'."; \
 	    echo "         Required: TDX_MR_TD TDX_XFAM TDX_RTMR_0 TDX_RTMR_1 TDX_RTMR_2"; \
 	    echo "         Optional: TDX_RTMR_3 TDX_TD_ATTRIBUTES TDX_MR_SEAM"; \
 	fi
-	@echo "Computing tdx_pcr08 (initdata configuration binding) for namespace $(NAMESPACE)..."
+	@echo "Computing mr_config_id (initdata configuration binding) for namespace $(NAMESPACE)..."
 	@set -e; \
 	KBS_CERT=$$(oc get secret trusteeconfig-https-cert-secret -n trustee-operator-system \
 	    -o jsonpath='{.data.certificate}' | base64 -d); \
-	PCR8=$$(echo "$$KBS_CERT" | python3 scripts/build-initdata.py "https://kbs-service.trustee-operator-system.svc.cluster.local:8080" "$(NAMESPACE)" --pcr8-only \
+	MR_CONFIG_ID=$$(echo "$$KBS_CERT" | python3 scripts/build-initdata.py "https://kbs-service.trustee-operator-system.svc.cluster.local:8080" "$(NAMESPACE)" --mr-config-id \
 	    --policy-mode $(POLICY_MODE) \
 	    --app-image $(APP_IMG) \
 	    --model-image $(MODEL_IMG)); \
-	echo "tdx_pcr08: $$PCR8"; \
+	echo "mr_config_id: $$MR_CONFIG_ID"; \
 	[ -n "$(TDX_MR_SEAM)" ]       && echo "mr_seam:       $(TDX_MR_SEAM)"       || true; \
 	[ -n "$(TDX_TD_ATTRIBUTES)" ] && echo "td_attributes: $(TDX_TD_ATTRIBUTES)" || true; \
 	[ -n "$(TDX_MR_TD)" ]         && echo "mr_td:         $(TDX_MR_TD)"         || true; \
@@ -1436,7 +1437,7 @@ set-rvps-values:
 	    TDX_MR_TD="$(TDX_MR_TD)" TDX_XFAM="$(TDX_XFAM)" \
 	    TDX_RTMR_0="$(TDX_RTMR_0)" TDX_RTMR_1="$(TDX_RTMR_1)" \
 	    TDX_RTMR_2="$(TDX_RTMR_2)" TDX_RTMR_3="$(TDX_RTMR_3)" \
-	    python3 scripts/update-rvps.py "$$CURRENT_REF" "$$PCR8"); \
+	    python3 scripts/update-rvps.py "$$CURRENT_REF" "$$MR_CONFIG_ID"); \
 	PATCH=$$(echo "$$NEW_REF" | python3 -c 'import json,sys; print(json.dumps({"data":{"reference_value":sys.stdin.read().strip()}}))'); \
 	oc patch configmap trusteeconfig-rvps-reference-values \
 	    -n trustee-operator-system \
@@ -1476,8 +1477,16 @@ register-secrets-with-kbs:
 .PHONY: setup-attestation
 setup-attestation: set-rvps-values register-secrets-with-kbs
 
-.PHONY: patch-cpu-policy
-patch-cpu-policy:
+.PHONY: patch-cpu-policy-initdata
+patch-cpu-policy-initdata:
+	@python3 attestation-policies/patch-cpu-mr-config-id.py | oc apply -f -
+	@echo "Restarting Trustee to pick up the updated CPU attestation policy..."
+	@oc rollout restart deployment/trustee-deployment -n trustee-operator-system
+	@oc rollout status deployment/trustee-deployment -n trustee-operator-system --timeout=2m
+	@echo "CPU attestation policy patched to enforce initdata validation."
+
+.PHONY: patch-cpu-policy-firmwarelevel
+patch-cpu-policy-firmwarelevel:
 	@python3 attestation-policies/patch-cpu-tcb-date.py | oc apply -f -
 	@echo "Restarting Trustee to pick up the updated CPU attestation policy..."
 	@oc rollout restart deployment/trustee-deployment -n trustee-operator-system
@@ -1520,9 +1529,9 @@ show-rvps:
 	    echo "Error: trusteeconfig-https-cert-secret not found — run make setup-trustee-in-cluster first"; exit 1; \
 	}; \
 	KBS_SVC_URL="https://kbs-service.trustee-operator-system.svc.cluster.local:8080"; \
-	PCR8=$$(oc get secret trusteeconfig-https-cert-secret -n trustee-operator-system \
+	MR_CONFIG_ID=$$(oc get secret trusteeconfig-https-cert-secret -n trustee-operator-system \
 	    -o jsonpath='{.data.certificate}' | base64 -d \
-	    | python3 scripts/build-initdata.py "$$KBS_SVC_URL" "$(NAMESPACE)" --pcr8-only \
+	    | python3 scripts/build-initdata.py "$$KBS_SVC_URL" "$(NAMESPACE)" --mr-config-id \
 	        --policy-mode $(POLICY_MODE) \
 	        --app-image $(APP_IMG) \
 	        --model-image $(MODEL_IMG)); \
@@ -1533,7 +1542,7 @@ show-rvps:
 	TDX_MR_TD="$(TDX_MR_TD)" TDX_XFAM="$(TDX_XFAM)" \
 	TDX_RTMR_0="$(TDX_RTMR_0)" TDX_RTMR_1="$(TDX_RTMR_1)" \
 	TDX_RTMR_2="$(TDX_RTMR_2)" TDX_RTMR_3="$(TDX_RTMR_3)" \
-	python3 scripts/show-rvps.py "$$PCR8" "$$CURRENT"
+	python3 scripts/show-rvps.py "$$MR_CONFIG_ID" "$$CURRENT"
 
 .PHONY: trustee-logs
 trustee-logs:

@@ -6,8 +6,8 @@ would register and what is currently stored in the trustee ConfigMap.
 Shows all known TDX attestation fields with a clear indicator of whether each
 will be registered or not, and why.
 
-Usage: show-rvps.py <pcr8_value> [<current_configmap_json>]
-  pcr8_value           - hex PCR8 computed from current initdata (pass '-' to skip)
+Usage: show-rvps.py <mr_config_id_value> [<current_configmap_json>]
+  mr_config_id_value     - hex mr_config_id computed from current initdata (pass '-' to skip)
   current_configmap_json - JSON from the reference_value configmap key (optional)
 
 TDX hardware measurements are read from environment variables:
@@ -32,9 +32,9 @@ import sys
 # action:   what to do when it changes
 FIELDS = [
     {
-        "name":    "tdx_pcr08",
+        "name":    "mr_config_id",
         "desc":    "initdata configuration binding",
-        "detail":  "SHA256(zeroes32 || SHA256(initdata_toml_bytes))",
+        "detail":  "SHA256(initdata_toml_bytes) zero-padded to 48 bytes (96 hex chars)",
         "env_key": None,
         "note":    None,
         "changes": "KBS TLS cert rotates (cert-manager); namespace changes; policy mode "
@@ -145,12 +145,12 @@ def wrap(text, indent, width=W):
 
 # ── Collect computed values ───────────────────────────────────────────────────
 
-pcr8         = sys.argv[1] if len(sys.argv) > 1 else "-"
+mr_config_id = sys.argv[1] if len(sys.argv) > 1 else "-"
 current_json = sys.argv[2] if len(sys.argv) > 2 else "{}"
 
 computed = {}
-if pcr8 and pcr8 != "-":
-    computed["tdx_pcr08"] = pcr8
+if mr_config_id and mr_config_id != "-":
+    computed["mr_config_id"] = mr_config_id
 for f in FIELDS:
     if f["env_key"]:
         val = os.environ.get(f["env_key"], "").strip()

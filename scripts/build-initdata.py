@@ -2,12 +2,12 @@
 """
 Build the cc_init_data blob for the kata VM.
 
-Usage: build-initdata.py <KBS_URL> <NAMESPACE> [--pcr8-only]
+Usage: build-initdata.py <KBS_URL> <NAMESPACE> [--mr-config-id]
                          [--policy-mode dev|locked]
                          [--app-image <repo>] [--model-image <repo>]
   Reads the KBS TLS certificate PEM from stdin.
   Default: prints the gzip+base64-encoded initdata TOML to stdout.
-  --pcr8-only: prints the tdx_pcr08 hex value to stdout instead.
+  --mr-config-id: prints the TDX mr_config_id hex value to stdout instead.
   --policy-mode: selects scripts/policy-dev.rego or scripts/policy-locked.rego
                  (default: locked)
   --app-image / --model-image: image repo prefixes substituted into the locked
@@ -19,10 +19,11 @@ is present, binding the pod's KBS endpoint and image policy to the hardware
 measurement.  On the dev cluster (no TEE) the hash is computed but not bound
 to hardware; the binding activates when the pod moves to the bare metal cluster.
 
-tdx_pcr08 is the vTPM PCR8 value after extending the initdata hash:
-  SHA256(zeroes_32 || SHA256(initdata_toml_bytes))
-Registering this in RVPS prevents the cluster admin from modifying the initdata
-(KBS URL, image policy URI, namespace) without failing the configuration check.
+mr_config_id is the TDX hardware register that binds the quote to the initdata:
+  SHA256(initdata_toml_bytes) zero-padded to 48 bytes (96 hex chars)
+The Kata runtime places this value into the TDX quote's mr_config_id field.
+Registering it in RVPS and checking it in the attestation policy prevents a pod
+with different initdata (e.g. without the exec-deny policy) from receiving the key.
 """
 import argparse
 import base64
@@ -34,13 +35,13 @@ import sys
 parser = argparse.ArgumentParser()
 parser.add_argument("kbs_url")
 parser.add_argument("namespace")
-parser.add_argument("--pcr8-only", action="store_true")
+parser.add_argument("--mr-config-id", action="store_true")
 parser.add_argument("--policy-mode", default="locked", choices=["dev", "locked"])
 parser.add_argument("--app-image", default="")
 parser.add_argument("--model-image", default="")
 parsed = parser.parse_args()
 
-pcr8_only = parsed.pcr8_only
+mr_config_id_only = parsed.mr_config_id
 kbs_url = parsed.kbs_url
 namespace = parsed.namespace
 policy_mode = parsed.policy_mode
@@ -109,10 +110,9 @@ version = "0.1.0"
 
 toml_bytes = toml.encode()
 
-if pcr8_only:
-    pcr = bytes(32)
-    toml_hash = hashlib.sha256(toml_bytes).digest()
-    pcr8 = hashlib.sha256(pcr + toml_hash).hexdigest()
-    print(pcr8, end="")
+if mr_config_id_only:
+    toml_hash = hashlib.sha256(toml_bytes).digest()   # 32 bytes
+    mr_config_id = (toml_hash + bytes(16)).hex()       # zero-pad to 48 bytes = 96 hex chars
+    print(mr_config_id, end="")
 else:
     print(base64.b64encode(gzip.compress(toml_bytes)).decode(), end="")
