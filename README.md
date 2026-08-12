@@ -25,7 +25,6 @@ AI-powered classification from North Sea seismic data — running with a three-f
   - [Intel TDX Quote Generation Service setup — application deployer (cluster-admin, once per cluster, Intel TDX only)](#intel-tdx-quote-generation-service-setup--application-deployer-cluster-admin-once-per-cluster-intel-tdx-only)
   - [Trustee setup — model owner (cluster-admin, once per cluster)](#trustee-setup--model-owner-cluster-admin-once-per-cluster)
     - [Install Trustee](#install-trustee)
-    - [Install Trustee](#install-trustee)
     - [Patch default CPU policy](#patch-default-cpu-policy)
     - [Register RVPS reference values](#register-rvps-reference-values)
     - [Register app-specific secrets with KBS](#register-app-specific-secrets-with-kbs)
@@ -1229,6 +1228,394 @@ oc rollout status deployment/trustee-deployment -n trustee-operator-system --tim
 
 </details>
 
+You can check the rvps values that were registered and double check that they were registered correctly
+with trustee by running:
+
+```
+make show-rvps NAMESPACE=$NAMESPACE
+```
+
+This shows you what would be registered if you ran make show-rvps as well as a check against what
+has already been registred.
+
+You should seen an output like the following where in the second section
+is indicates that all values match a registered value except for
+`mr_seam` that we have not registered for the quickstart because it
+would require that your firmware version match the exact value specified.
+For a production deployment you may want to set it for the maximum level
+of safet` that we have not registered for the quickstart because it
+would require that your firmware version match the exact value specified.
+For a production deployment you may want to set it for the maximum level
+of safety. 
+
+```
+========================================================================
+ RVPS REFERENCE VALUES
+========================================================================
+
+?? Would be registered by 'make setup-attestation' =====================
+
+  ?  tdx_pcr08       initdata configuration binding
+                   SHA256(zeroes32 || SHA256(initdata_toml_bytes))
+                   changes: KBS TLS cert rotates (cert-manager);
+                   namespace changes; policy mode changes; KBS URL
+                   changes
+                   action: make setup-attestation ? re-run whenever
+                   'make install' would produce a different initdata
+                   blob
+                   3b24f5e8ab27de570ae1319f2529e1f4be2a5ffd1daf1ebc5da59ae977aa107c
+
+  ?  mr_td           TDVF guest firmware (OVMF)
+                   measurement of the OVMF firmware pages loaded into the TD at creation
+                   changes: OSC upgrade that updates the kata TDVF/OVMF
+                   binary
+                   action: make collect-tdx-measurements, then make
+                   setup-attestation
+                   27fb849fb05653add8be4b8c5b2793e66d1e25773a5c6f80dabbc10a5cb18bc40b7d5caaaf299e3a200f7018cdaa6f74
+
+  ?  xfam            CPU extended feature mask
+                   QEMU CPU feature flags exposed to the TD (AVX, AMX, etc.)
+                   changes: very rarely ? only if QEMU CPU model or OSC
+                   QEMU config changes
+                   action: make collect-tdx-measurements, then make
+                   setup-attestation
+                   e702060000000000
+
+  ?  rtmr_0          TDVF boot handoff measurement
+                   extended by TDVF before handing off to the bootloader/kernel
+                   changes: OSC upgrade that updates TDVF; same cadence
+                   as mr_td
+                   action: make collect-tdx-measurements, then make
+                   setup-attestation
+                   01cbbe9a7adb5f1f9459085d6f9f4bd02a5bf5352a8287b4ba963b35bc3f022c571fde23d04cb485acb4733f09b53493
+
+  ?  rtmr_1          kata guest kernel + command line
+                   extended by the bootloader with the kernel image and cmdline
+                   changes: OSC upgrade that updates the kata guest
+                   kernel
+                   action: make collect-tdx-measurements, then make
+                   setup-attestation
+                   93a576941cfe92d6427106944e475e96b702d1049975b6c64512345857d69dbab8d14c5f3dc88931cc582c9974fae8cc
+
+  ?  rtmr_2          kata guest initrd (kata-agent, CDH, AA)
+                   extended with the initrd containing the kata guest components
+                   changes: OSC upgrade that updates kata-agent, CDH, or
+                   AA in the initrd
+                   action: make collect-tdx-measurements, then make
+                   setup-attestation
+                   e882c8d18de74cc30d506d56962e5d3eb33c98e6c25f0329857c29f03a48fb17b6c6b1e2acc4741b305a6656a5f7d6c9
+
+  ?  rtmr_3          post-boot guest measurements
+                   reserved for guest OS runtime use; typically all-zeros in kata-cc
+                   changes: only if kata-cc begins using RTMR[3] for
+                   runtime measurements
+                   action: make collect-tdx-measurements, then make
+                   setup-attestation
+                   000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+
+  ?  td_attributes   TD attribute flags
+                   bit 0 = debug mode ? must be 0 for a confidential production workload
+                   changes: only if QEMU/kata configuration enables or
+                   disables debug mode
+                   action: make collect-tdx-measurements, then make
+                   setup-attestation; verify bit 0 is 0 before
+                   registering
+                   0000001000000000
+
+  ?  mr_seam         Intel TDX module version
+                   measurement of the Intel TDX module running on the host CPU
+                   changes: host firmware update that upgrades the Intel
+                   TDX module (independent of OSC upgrades)
+                   action: make collect-tdx-measurements, then make
+                   setup-attestation
+                   NOTE: export TDX_MR_SEAM from scripts/collect-tdx-measurements.sh
+
+
+?? Currently registered in trustee-operator-system =====================
+
+  ?  tdx_pcr08       initdata configuration binding
+                   1 values  expires 2099-12-31T00:00:00Z
+    [21]  3b24f5e8ab27de570ae1319f2529e1f4be2a5ffd1daf1ebc5da59ae977aa107c  ? matches computed
+
+  ?  mr_td           TDVF guest firmware (OVMF)
+                   1 value  expires 2099-12-31T00:00:00Z
+    [1]  27fb849fb05653add8be4b8c5b2793e66d1e25773a5c6f80dabbc10a5cb18bc40b7d5caaaf299e3a200f7018cdaa6f74  ? matches computed
+
+  ?  xfam            CPU extended feature mask
+                   1 value  expires 2099-12-31T00:00:00Z
+    [1]  e702060000000000  ? matches computed
+
+  ?  rtmr_0          TDVF boot handoff measurement
+                   1 value  expires 2099-12-31T00:00:00Z
+    [1]  01cbbe9a7adb5f1f9459085d6f9f4bd02a5bf5352a8287b4ba963b35bc3f022c571fde23d04cb485acb4733f09b53493  ? matches computed
+
+  ?  rtmr_1          kata guest kernel + command line
+                   1 value  expires 2099-12-31T00:00:00Z
+    [1]  93a576941cfe92d6427106944e475e96b702d1049975b6c64512345857d69dbab8d14c5f3dc88931cc582c9974fae8cc  ? matches computed
+
+  ?  rtmr_2          kata guest initrd (kata-agent, CDH, AA)
+                   1 value  expires 2099-12-31T00:00:00Z
+    [1]  e882c8d18de74cc30d506d56962e5d3eb33c98e6c25f0329857c29f03a48fb17b6c6b1e2acc4741b305a6656a5f7d6c9  ? matches computed
+
+  ?  rtmr_3          post-boot guest measurements
+                   1 value  expires 2099-12-31T00:00:00Z
+    [1]  000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000  ? matches computed
+
+  ?  td_attributes   TD attribute flags
+                   1 value  expires 2099-12-31T00:00:00Z
+    [1]  0000001000000000  ? matches computed
+
+  ?  mr_seam         Intel TDX module version
+                   not registered in configmap
+
+
+```
+
+The KBS will not release the model key unless one of the sets of
+registered rvps values matches the init values specificed when the
+pod was started.
+
+The intructions are constructed so that every time you follow them you 
+are adding an additional allowed set of rvps values. To clear out
+the set of allowed rvps values you can run:
+
+```
+make clear-rvps NAMESPACE=$NAMESPACE
+```
+
+`tdx_pcr08` is a hash of the initdata for the KBS to release a key one of the registered rvps sets must
+match including the tdx_pcr08 with the hash of the initdata used when the pod was started. You can view the
+itdata that will be set when you deploy the application by running:
+
+```
+make show-initdata NAMESPACE=$NAMESPACE
+```
+
+and you should see something like:
+
+```
+========================================================================
+ INITDATA  policy-mode=locked  namespace=seismic-interpretation
+========================================================================
+
+== aa.toml =============================================================
+[token_configs]
+[token_configs.coco_as]
+url = "https://kbs-service.trustee-operator-system.svc.cluster.local:8080"
+
+[token_configs.kbs]
+url = "https://kbs-service.trustee-operator-system.svc.cluster.local:8080"
+cert = """
+-----BEGIN CERTIFICATE-----
+MIIEETCCAvmgAwIBAgIUYKXVC85426q0AGewikd4/1+86dwwDQYJKoZIhvcNAQEL
+BQAwSDEgMB4GA1UEChMXdHJ1c3RlZS1vcGVyYXRvci1zeXN0ZW0xJDAiBgNVBAMT
+G2ticy10cnVzdGVlLW9wZXJhdG9yLXN5c3RlbTAeFw0yNjA3MjAyMjQwMzRaFw0y
+NzA3MjAyMjQwMzRaMEgxIDAeBgNVBAoTF3RydXN0ZWUtb3BlcmF0b3Itc3lzdGVt
+MSQwIgYDVQQDExtrYnMtdHJ1c3RlZS1vcGVyYXRvci1zeXN0ZW0wggEiMA0GCSqG
+SIb3DQEBAQUAA4IBDwAwggEKAoIBAQDGNkso58Zs3m5vx45AjkzWT0tigBIzrsP7
+2/1qMMJBOtlj8cJ8NOnq9s8lKY6NApaef8zKmg4n8TcNWSXfeEPK0FWRLH6dI9Vn
+F5oP7DUSgognECcZHVGhwkHTmfZ6aB6h54HC7//cR7b7eAkRRl3n3koxq3CLMdl0
+U26/gkx4Wa5ev6lkVSwqpozzORpA5ifZvreQKJIaVYHqppsUYMnABnWPVY5IewUX
+d6Q5mnlmT7rSWyTPO79tYK5dRF7aYJE5dXFHZH3QFOUSRHk8zY/+XLugimtBIBVx
+hy3VLXKaPzagsW/Zk5MoGU4aq2I9drr7CxGma7xxUTU7zwOBWfmvAgMBAAGjgfIw
+ge8wDgYDVR0PAQH/BAQDAgWgMAwGA1UdEwEB/wQCMAAwgc4GA1UdEQSBxjCBw4Jh
+a2JzLXNlcnZpY2UtdHJ1c3RlZS1vcGVyYXRvci1zeXN0ZW0uYXBwcy5mYWIyNzJj
+MC00ODIyLTRlMmQtZDAzNS0xZDdiYTA2NzA2YWQubnZpZGlhbGF1bmNocGFkLmNv
+bYIna2JzLXNlcnZpY2UudHJ1c3RlZS1vcGVyYXRvci1zeXN0ZW0uc3ZjgjVrYnMt
+c2VydmljZS50cnVzdGVlLW9wZXJhdG9yLXN5c3RlbS5zdmMuY2x1c3Rlci5sb2Nh
+bDANBgkqhkiG9w0BAQsFAAOCAQEAJb23X6zf2qGTsnN22xtD+neIgYfUJQIH1akf
+TWy+Vw8+7hSB3SH+ZxZSfPcTeJRqskBLbYh+Ro7pZQVH0HwgxWKxpxxqYOZCMl7L
+I6MKW91z/dkhBQJY49XwCRZSGocvhNoTxvkEIHO1dEZa8rJTYohtDrjP+eIcQ8+5
+j4fNcnahlM2s28KToN/ZFbIKRtY7Aen/xla2Mzs/x8FpvsxIyYjYNW9ecF9dkNAs
+/zQ8JJGZ1VexWD32zpQWHDgxofGClRh7VSy28G0/Kk98he5bb2wsu9D8hs+/sned
+eir8czQqee3+FkbGp9dDcOaD6G4KlwKnps319NZAeYWVnQl9gQ==
+-----END CERTIFICATE-----
+"""
+
+== cdh.toml ============================================================
+socket = 'unix:///run/confidential-containers/cdh.sock'
+credentials = []
+
+[kbc]
+name = "cc_kbc"
+url = "https://kbs-service.trustee-operator-system.svc.cluster.local:8080"
+kbs_cert = """
+-----BEGIN CERTIFICATE-----
+MIIEETCCAvmgAwIBAgIUYKXVC85426q0AGewikd4/1+86dwwDQYJKoZIhvcNAQEL
+BQAwSDEgMB4GA1UEChMXdHJ1c3RlZS1vcGVyYXRvci1zeXN0ZW0xJDAiBgNVBAMT
+G2ticy10cnVzdGVlLW9wZXJhdG9yLXN5c3RlbTAeFw0yNjA3MjAyMjQwMzRaFw0y
+NzA3MjAyMjQwMzRaMEgxIDAeBgNVBAoTF3RydXN0ZWUtb3BlcmF0b3Itc3lzdGVt
+MSQwIgYDVQQDExtrYnMtdHJ1c3RlZS1vcGVyYXRvci1zeXN0ZW0wggEiMA0GCSqG
+SIb3DQEBAQUAA4IBDwAwggEKAoIBAQDGNkso58Zs3m5vx45AjkzWT0tigBIzrsP7
+2/1qMMJBOtlj8cJ8NOnq9s8lKY6NApaef8zKmg4n8TcNWSXfeEPK0FWRLH6dI9Vn
+F5oP7DUSgognECcZHVGhwkHTmfZ6aB6h54HC7//cR7b7eAkRRl3n3koxq3CLMdl0
+U26/gkx4Wa5ev6lkVSwqpozzORpA5ifZvreQKJIaVYHqppsUYMnABnWPVY5IewUX
+d6Q5mnlmT7rSWyTPO79tYK5dRF7aYJE5dXFHZH3QFOUSRHk8zY/+XLugimtBIBVx
+hy3VLXKaPzagsW/Zk5MoGU4aq2I9drr7CxGma7xxUTU7zwOBWfmvAgMBAAGjgfIw
+ge8wDgYDVR0PAQH/BAQDAgWgMAwGA1UdEwEB/wQCMAAwgc4GA1UdEQSBxjCBw4Jh
+a2JzLXNlcnZpY2UtdHJ1c3RlZS1vcGVyYXRvci1zeXN0ZW0uYXBwcy5mYWIyNzJj
+MC00ODIyLTRlMmQtZDAzNS0xZDdiYTA2NzA2YWQubnZpZGlhbGF1bmNocGFkLmNv
+bYIna2JzLXNlcnZpY2UudHJ1c3RlZS1vcGVyYXRvci1zeXN0ZW0uc3ZjgjVrYnMt
+c2VydmljZS50cnVzdGVlLW9wZXJhdG9yLXN5c3RlbS5zdmMuY2x1c3Rlci5sb2Nh
+bDANBgkqhkiG9w0BAQsFAAOCAQEAJb23X6zf2qGTsnN22xtD+neIgYfUJQIH1akf
+TWy+Vw8+7hSB3SH+ZxZSfPcTeJRqskBLbYh+Ro7pZQVH0HwgxWKxpxxqYOZCMl7L
+I6MKW91z/dkhBQJY49XwCRZSGocvhNoTxvkEIHO1dEZa8rJTYohtDrjP+eIcQ8+5
+j4fNcnahlM2s28KToN/ZFbIKRtY7Aen/xla2Mzs/x8FpvsxIyYjYNW9ecF9dkNAs
+/zQ8JJGZ1VexWD32zpQWHDgxofGClRh7VSy28G0/Kk98he5bb2wsu9D8hs+/sned
+eir8czQqee3+FkbGp9dDcOaD6G4KlwKnps319NZAeYWVnQl9gQ==
+-----END CERTIFICATE-----
+"""
+
+[image]
+image_security_policy_uri = 'kbs:///default/seismic-interpretation/image-policy'
+
+== policy.rego =========================================================
+package agent_policy
+import future.keywords.in
+import future.keywords.if
+import future.keywords.every
+default AddARPNeighborsRequest := true
+default AddSwapRequest := false
+default CloseStdinRequest := true
+default CopyFileRequest := false
+default CreateContainerRequest := false
+default CreateSandboxRequest := false
+default DestroySandboxRequest := true
+default GetDiagnosticDataRequest := false
+default GetMetricsRequest := false
+default GetOOMEventRequest := true
+default GuestDetailsRequest := true
+default ListInterfacesRequest := true
+default ListRoutesRequest := true
+default MemHotplugByProbeRequest := false
+default OnlineCPUMemRequest := false
+default PauseContainerRequest := false
+default PullImageRequest := false
+default ReadStreamRequest := true
+default RemoveContainerRequest := true
+default RemoveStaleVirtiofsShareMountsRequest := true
+default ReseedRandomDevRequest := true
+default ResumeContainerRequest := false
+default SetGuestDateTimeRequest := true
+default SetPolicyRequest := false
+default SignalProcessRequest := false
+default StartContainerRequest := true
+default StartTracingRequest := false
+default StatsContainerRequest := true
+default StopTracingRequest := false
+default TtyWinResizeRequest := false
+default UpdateContainerRequest := false
+default UpdateEphemeralMountsRequest := false
+default UpdateInterfaceRequest := true
+default UpdateRoutesRequest := true
+default WaitProcessRequest := true
+default WriteStreamRequest := false
+default ExecProcessRequest := false
+
+# Allow sandbox creation only if no guest OCI hooks are injected and no kernel modules
+# are loaded ? prevents host-side injection of hooks or modules into the guest VM.
+CreateSandboxRequest if {
+    input.guest_hook_path == ""
+    count(input.kernel_modules) == 0
+}
+
+# Allow exact system networking files
+CopyFileRequest if {
+    allowed_system_paths := {
+        "/etc/resolv.conf",
+        "/etc/hosts",
+        "/etc/hostname"
+    }
+    allowed_system_paths[input.path]
+}
+
+# Allow Kubernetes mounted volumes (ConfigMaps, Secrets, Tokens)
+# Kata Containers stages host-side volume mounts inside this shared guest directory:
+CopyFileRequest if {
+    startswith(input.path, "/run/kata-containers/shared/containers/")
+}
+
+# Only allow pulling images whose registry path matches an image_guest_pull source
+# declared in policy_data ? blocks pulling arbitrary images inside the guest VM.
+PullImageRequest if {
+    some container in policy_data.containers
+    some allowed_storage in container.storages
+    allowed_storage.driver == "image_guest_pull"
+    startswith(input.image, allowed_storage.source)
+}
+
+# Restrict signals to graceful shutdown (SIGTERM=15) and force kill (SIGKILL=9) only ?
+# prevents arbitrary signal injection into guest processes from the host.
+SignalProcessRequest if { input.signal == 15 }
+SignalProcessRequest if { input.signal == 9 }
+
+# Allow container creation only if the requested args and all storages exactly match
+# a known container entry in policy_data ? binds each container to its declared identity.
+CreateContainerRequest if {
+    some container in policy_data.containers
+    input.OCI.Process.Args == container.OCI.Process.Args
+    count(input.storages) > 0
+    every storage in input.storages {
+        storage_allowed(storage, container)
+    }
+}
+
+# A storage is allowed only if it matches a declared entry in the container's policy_data
+# storages list by both driver and source prefix ? rejects unexpected drivers or registries.
+storage_allowed(storage, container) if {
+    some allowed_storage in container.storages
+    storage.driver == allowed_storage.driver
+    startswith(storage.source, allowed_storage.source)
+}
+
+policy_data := {
+    "containers": [
+        {
+            "OCI": {
+                "Process": {
+                    "Args": ["/usr/bin/pod"]
+                }
+            },
+            "storages": [
+                {"driver": "image_guest_pull", "source": "pause"}
+            ]
+        },
+        {
+            "OCI": {
+                "Process": {
+                    "Args": ["/bin/cp", "-r", "/model/.", "/models-cache/"]
+                }
+            },
+            "storages": [
+                {"driver": "image_guest_pull", "source": "quay.io/midawson/conf-gpu-accel-seismic-interp-deepseismic-model:"},
+                {"driver": "image_guest_pull", "source": "quay.io/midawson/conf-gpu-accel-seismic-interp-deepseismic-model@"},
+                {"driver": "ephemeral", "source": "tmpfs"}
+            ]
+        },
+        {
+            "OCI": {
+                "Process": {
+                    "Args": ["/bin/bash", "-c", "bash /app/decrypt.sh && python /app/app.py"]
+                }
+            },
+            "storages": [
+                {"driver": "image_guest_pull", "source": "quay.io/midawson/conf-gpu-accel-seismic-interp-deepseismic-app:"},
+                {"driver": "image_guest_pull", "source": "quay.io/midawson/conf-gpu-accel-seismic-interp-deepseismic-app@"},
+                {"driver": "ephemeral", "source": "tmpfs"}
+            ]
+        }
+    ]
+}
+
+
+========================================================================
+  TOML SHA-256 : 58dd4bdd362f5ab68acc46e3653f9ac849f6292f74f6523e2770e963d38b1670
+  PCR8 (RVPS)  : 3b24f5e8ab27de570ae1319f2529e1f4be2a5ffd1daf1ebc5da59ae977aa107c
+  Encoded size : 3.7 KB  (3808 chars base64)
+========================================================================
+
+```
+
 #### Register app-specific secrets with KBS
 
 Register the model decryption key, cosign public key, and image verification policy with KBS. Secrets are registered as a Kubernetes Secret in `trustee-operator-system` named after the deployment namespace; the Trustee operator mounts it into KBS via its `kbsSecretResources` mechanism.
@@ -1430,6 +1817,17 @@ you should see these two sections:
 
 CPU attestation
 ```
+[OK ] cpu0 (status: affirming)
+Trustworthiness vector:
+executables 4 (affirming)
+hardware 2 (affirming)
+configuration 2 (affirming)
+TDX / CPU Evidence:
+init_data 58dd4bdd362f5ab68acc46e3653f9ac849f6292f74f6523e2770e963d38b167000000000000000000000000000000000
+init_data_claims:
+aa.toml:
+token_configs:
+coco_as:
 ```
 
 GPU attestation:
