@@ -25,6 +25,8 @@ AI-powered classification from North Sea seismic data — running with a three-f
   - [Intel TDX Quote Generation Service setup — application deployer (cluster-admin, once per cluster, Intel TDX only)](#intel-tdx-quote-generation-service-setup--application-deployer-cluster-admin-once-per-cluster-intel-tdx-only)
   - [Trustee setup — model owner (cluster-admin, once per cluster)](#trustee-setup--model-owner-cluster-admin-once-per-cluster)
     - [Install Trustee](#install-trustee)
+    - [Install Trustee](#install-trustee)
+    - [Patch default CPU policy](#patch-default-cpu-policy)
     - [Register RVPS reference values](#register-rvps-reference-values)
     - [Register app-specific secrets with KBS](#register-app-specific-secrets-with-kbs)
   - [Application deployment — application deployer (namespace admin)](#application-deployment--application-deployer-namespace-admin)
@@ -1115,6 +1117,38 @@ oc annotate route kbs-route -n trustee-operator-system \
 
 </details>
 
+#### Patch default CPU policy
+
+The default Trustee CPU attestation policy requires `tcb_status == "UpToDate"` before it will set the hardware trustworthiness claim to affirming and release the model key. In practice, Intel issues TCB Recovery events on an irregular schedule, and a platform whose TCB was fully up to date when this quickstart was written may show `OutOfDate` by the time you run it because a newer TCB version has been published since the platform was last updated. In production this default makes sense, but for the quickstart we chose to patch the policy to allow TCB versions after a fixed date in order to minimize the chances you need to upgrade your firmware to run the quickstart.
+
+The patched policy replaces the `UpToDate` requirement with a minimum acceptable TCB date (`2026-02-11`). Platforms certified to that TCB level or newer will pass the hardware check regardless of whether a more recent TCB has since been issued. The `tcb_date` is tied to a specific Intel TCB Recovery event and does not change unless the platform firmware is updated; it is therefore a stable, predictable condition to check against. Available TCB dates can be found at:
+
+```
+curl -s https://api.trustedservices.intel.com/tdx/certification/v4/tcbevaluationdatanumbers | jq
+```
+
+> **Production note:** For a production deployment, the default requirement of `tcb_status == "UpToDate"` is safer — it ensures the platform is always running the latest certified firmware before releasing the key. The date-based approach is a deliberate relaxation made here to keep the quickstart functional as TCB versions advance.
+
+<details open>
+<summary>Make instructions</summary>
+
+```bash
+make patch-cpu-policy
+```
+
+</details>
+
+<details>
+<summary>Manual instructions</summary>
+
+```bash
+python3 attestation-policies/patch-cpu-tcb-date.py | oc apply -f -
+oc rollout restart deployment/trustee-deployment -n trustee-operator-system
+oc rollout status deployment/trustee-deployment -n trustee-operator-system --timeout=2m
+```
+
+</details>
+
 #### Register RVPS reference values
 
 The attestation policy requires the following values in RVPS before it will release the model key:
@@ -1366,21 +1400,99 @@ oc exec -n trustee-operator-system deployment/trustee-deployment -- \
 # expect: conf-seismic-cosign-key  conf-seismic-image-policy  conf-seismic-model-key
 ```
 
-To confirm that attestation succeeded and the model key was fetched from KBS, inspect the app container logs:
+To confirm that attestation succeeded and the model key was fetched from KBS, inspect the app container logs 
+as shown below.
+
+** NOTE: ** in a real deployment you may chose to disable logs in the policy in order to avoid the posibility
+of the container leaking information. We've left them enabled in the quickstart so that we can more easily show
+and explain how things are working.
 
 ```bash
 POD=$(oc get pod -n seismic-interpretation -l app.kubernetes.io/name=seismic-app -o jsonpath='{.items[0].metadata.name}')
 oc logs -n seismic-interpretation $POD -c app | head -10
 ```
 
-**Expected outcome:**
+At the end of the logs you should see the logs confirming that the model key was released to the confidential
+container from the key broker service:
 ```
-Waiting for CDH to be ready...
+Fetching model key from KBS via CDH (URL: http://127.0.0.1:8006/cdh/resource/default/seismic-interpretation/model-key)...
 Key received from KBS via CDH
 Model decrypted to /models-cache/dutchf3_unet_final.pth
 Device: cuda
 Loading model from /models-cache/dutchf3_unet_final.pth ...
 Model ready.
+* Running on local URL: http://0.0.0.0:7860
+* To create a public link, set `share=True` in `launch()`.
+```
+
+The key broker will only release the key if required attestation has passed. If you look higher up in the log
+you should see these two sections:
+
+CPU attestation
+```
+```
+
+GPU attestation:
+```
+ [OK  ] gpu0  (status: affirming)
+    Trustworthiness vector:
+        executables              3  (affirming)
+        hardware                 2  (affirming)
+        configuration            3  (affirming)
+    NVIDIA / GPU Evidence:
+        dbgstat                        disabled
+        eat_nonce                      93a1dc046894c02986253b3567bc817079f0d552e5138e3623e94d1f6f46d630
+        exp                            1786545215
+        hwmodel                        GH100
+        iat                            1786541615
+        iss                            https://nras.attestation.nvidia.com
+        jti                            e9bda4bd-d8a2-4ecc-aefd-3a4188cc9913
+        measres                        success
+        nbf                            1786541615
+        oemid                          5703
+        secboot                        True
+        ueid                           412049743786641620314516267838943504021408375555
+        x-nvidia-attestation-warning   None
+        x-nvidia-gpu-arch-check        True
+        x-nvidia-gpu-attestation-report-cert-chain:
+          x-nvidia-cert-expiration-date  9999-12-31T23:59:59Z
+          x-nvidia-cert-ocsp-nonce-matches True
+          x-nvidia-cert-ocsp-response-valid True
+          x-nvidia-cert-ocsp-status      good
+          x-nvidia-cert-revocation-reason None
+          x-nvidia-cert-status           valid
+        x-nvidia-gpu-attestation-report-cert-chain-fwid-match True
+        x-nvidia-gpu-attestation-report-nonce-match True
+        x-nvidia-gpu-attestation-report-parsed True
+        x-nvidia-gpu-attestation-report-signature-verified True
+        x-nvidia-gpu-driver-rim-cert-chain:
+          x-nvidia-cert-expiration-date  2028-03-16T18:59:41Z
+          x-nvidia-cert-ocsp-nonce-matches True
+          x-nvidia-cert-ocsp-response-valid True
+          x-nvidia-cert-ocsp-status      good
+          x-nvidia-cert-revocation-reason None
+          x-nvidia-cert-status           valid
+        x-nvidia-gpu-driver-rim-fetched True
+        x-nvidia-gpu-driver-rim-measurements-available True
+        x-nvidia-gpu-driver-rim-schema-validated True
+        x-nvidia-gpu-driver-rim-signature-verified True
+        x-nvidia-gpu-driver-rim-version-match True
+        x-nvidia-gpu-driver-version    595.58.03
+        x-nvidia-gpu-vbios-index-no-conflict True
+        x-nvidia-gpu-vbios-rim-cert-chain:
+          x-nvidia-cert-expiration-date  2027-11-11T02:15:45Z
+          x-nvidia-cert-ocsp-nonce-matches True
+          x-nvidia-cert-ocsp-response-valid True
+          x-nvidia-cert-ocsp-status      good
+          x-nvidia-cert-revocation-reason None
+          x-nvidia-cert-status           valid
+        x-nvidia-gpu-vbios-rim-fetched True
+        x-nvidia-gpu-vbios-rim-measurements-available True
+        x-nvidia-gpu-vbios-rim-schema-validated True
+        x-nvidia-gpu-vbios-rim-signature-verified True
+        x-nvidia-gpu-vbios-rim-version-match True
+        x-nvidia-gpu-vbios-version     96.00.74.00.11
+        x-nvidia-overall-att-result    True
 ```
 
 Confirm the initdata annotation is present and decodes to valid TOML with the KBS URL:

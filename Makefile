@@ -146,6 +146,8 @@ help:
 	@echo "    register-secrets-with-kbs - Register model key, cosign key, and image policy with KBS"
 	@echo "                               via kbsSecretResources (requires NAMESPACE, MODEL_ENCRYPTION_KEY,"
 	@echo "                               model-owner-verification-keys/cosign.pub)"
+	@echo "    patch-cpu-policy         - Apply the quickstart CPU attestation policy (date-based TCB check instead"
+	@echo "                               of requiring UpToDate TCB status); restarts Trustee"
 	@echo "    setup-attestation        - Convenience target: runs set-rvps-values then register-secrets-with-kbs"
 	@echo "    validate-trustee-certificate - Verify the cert in trusteeconfig-https-cert-secret matches what"
 	@echo "                               KBS is currently serving; fails if cert-manager has rotated the cert"
@@ -1473,6 +1475,14 @@ register-secrets-with-kbs:
 
 .PHONY: setup-attestation
 setup-attestation: set-rvps-values register-secrets-with-kbs
+
+.PHONY: patch-cpu-policy
+patch-cpu-policy:
+	@python3 attestation-policies/patch-cpu-tcb-date.py | oc apply -f -
+	@echo "Restarting Trustee to pick up the updated CPU attestation policy..."
+	@oc rollout restart deployment/trustee-deployment -n trustee-operator-system
+	@oc rollout status deployment/trustee-deployment -n trustee-operator-system --timeout=2m
+	@echo "CPU attestation policy patched."
 
 .PHONY: show-initdata
 show-initdata:
