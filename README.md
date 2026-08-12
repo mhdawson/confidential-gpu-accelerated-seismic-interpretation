@@ -1216,13 +1216,12 @@ oc rollout status deployment/trustee-deployment -n trustee-operator-system --tim
 
 > **Restart required.** The Trustee pod must restart to pick up the updated `reference_value` configmap key. A rollout restart is needed for the new values to take effect.
 
+</details>
+
 > **Using a different OSC version?** The OVMF firmware and kata kernel measurements change with each OSC release, so the values in the Makefile will not match your environment. To collect the correct values:
 > 1. Run `./scripts/collect-tdx-measurements.sh $NAMESPACE` — it launches a temporary kata-cc probe pod, extracts the measurements, and deletes the pod when done.
-> 2. The script prints the OSC version, a Makefile variable block, and an `export` block.
-> 3. Paste the Makefile block into the Makefile (near `KATA_RUNTIME_CLASS`) and update the OSC version comment.
-> 4. Source the `export` lines into your shell, then run `make set-rvps-values NAMESPACE=$NAMESPACE` as normal.
-
-</details>
+> 2. The script prints the OSC version and a Makefile variable block.
+> 3. Paste the Makefile block into the Makefile (near `KATA_RUNTIME_CLASS`), update the OSC version comment, then run `make set-rvps-values NAMESPACE=$NAMESPACE` as normal.
 
 You can check the rvps values that were registered and double check that they were registered correctly
 with trustee by running:
