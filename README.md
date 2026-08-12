@@ -1955,15 +1955,123 @@ This confirms that the Kata agent exec-deny policy prevents anyone — including
 
 #### Try to change the policy
 
-In the previous section you attempted to exec into the container but were denied by the policy was set for the
+In the previous section you attempted to exec into the container but were denied by the policy set for the
 confidential container.
 
-The default policy used in the quickstart is in [policies/policy-locked.rego](policies/policy-locked.rego) and more specifically the line `default ExecProcessRequest := false
+The default policy used in the quickstart is in [policies/policy-locked.rego](policies/policy-locked.rego) and the line which cause the denial in the policy was `default ExecProcessRequest := false
 ` in the policy.
 
-So let's change the policy. Edit that line in policies/policy-locked.rego to change the line to `default ExecProcessRequest := false`.
+So let's change the policy. Edit that line in policies/policy-locked.rego to change the line to `default ExecProcessRequest := true`.
 
-Stop any running instance of the quickstart with `make uninstall` and then start the application again with `make install`
+Stop any running instance of the quickstart with `make uninstall` and then start the application again with `make install`. 
+
+You will notice that the app fails to deploy. Look at the events for the pod in the UI and you should see something like this:
+
+![Pod CDH ](cdh-resource-fetch-failed.png)
+
+which shows a failure with "Get resource failed"
+
+You can get the trustee logs by running
+
+```
+make trustee-logs
+```
+
+and you should see an entry like the following which sows that the kbs is refusing to return the image-policy which is needed to check the signatres on the containers. This is due the attestation failure due to the mismatch between the registered initdata and what the container was started with:
+
+```
+2026-08-12T21:29:28.883027Z  INFO Intel TDX: verifier::tdx: Quote DCAP check succeeded.
+2026-08-12T21:29:28.883049Z  INFO Intel TDX: verifier::tdx: MRCONFIGID check succeeded.
+2026-08-12T21:29:28.883114Z  INFO Intel TDX: verifier::tdx: EventLog integrity check succeeded.
+2026-08-12T21:29:28.883175Z  INFO attestation_service: Verifier/endorsement check passed. tee=Tdx tee_class="cpu"
+2026-08-12T21:29:29.105557Z  INFO attestation_service: Verifier/endorsement check passed. tee=Nvidia tee_class="gpu"
+2026-08-12T21:29:29.107466Z  WARN Regorus: attestation_service::ear_token::broker: No reference value found for the given id: tdvfkernel, use NULL as the returned value
+2026-08-12T21:29:29.108963Z  WARN Regorus: attestation_service::ear_token::broker: No reference value found for the given id: allowed_vbios_versions, use NULL as the returned value
+2026-08-12T21:29:29.108989Z  INFO Regorus: policy_engine::policy::rego: No claim data.policy.extensions found in policy.
+2026-08-12T21:29:29.109494Z  INFO actix_web::middleware::logger: 10.128.0.183 "POST /kbs/v0/attest HTTP/1.1" 200 40408 "-" "attestation-agent-kbs-client/0.1.0" 0.246653
+2026-08-12T21:29:29.113497Z ERROR kbs::error: PolicyDeny
+2026-08-12T21:29:29.113521Z  INFO actix_web::middleware::logger: 10.128.0.183 "GET /kbs/v0/resource/default/seismic-interpretation/image-policy HTTP/1.1" 401 110 "-" "attestation-agent-kbs-client/0.1.0" 0.001265
+2026-08-12T21:29:29.134013Z  INFO actix_web::middleware::logger: 10.128.0.183 "POST /kbs/v0/auth HTTP/1.1" 200 74 "-" "attestation-agent-kbs-client/0.1.0" 0.000447
+```
+
+The deployment fails early as it tries to get the image policy from the KBS, but what about if we remove the image policy which requires signatures froms the initdata?
+
+Do that by removing the [image] and image_security_policy_uri lines in build-initdata.py
+
+```
+diff --git a/scripts/build-initdata.py b/scripts/build-initdata.py
+index ddb729b..6312ef4 100755
+--- a/scripts/build-initdata.py
++++ b/scripts/build-initdata.py
+@@ -86,8 +86,6 @@ kbs_cert = \"\"\"
+ {kbs_cert}
+ \"\"\"
+ 
+-[image]
+-image_security_policy_uri = 'kbs:///default/{namespace}/image-policy'\
+ """
+ 
+ toml = f"""\
+```
+
+Start and stop the app with `make uninstall` and then `make install` again. This time you should see that the
+deployment gets furhter along and the app tries to start up but the KBS does not release the key with error like this:
+
+```
+> GET /cdh/resource/default/seismic-interpretation/model-key HTTP/1.1
+> Host: 127.0.0.1:8006
+> User-Agent: curl/7.76.1
+> Accept: */*
+> 
+  0     0    0     0    0     0      0      0 --:--:--  0:00:03 --:--:--     0* Mark bundle as not supporting multiuse
+< HTTP/1.1 500 Internal Server Error
+< content-length: 216
+< date: Wed, 12 Aug 2026 21:48:20 GMT
+< 
+{ [216 bytes data]
+100   216  100   216    0     0     52      0  0:00:04  0:00:04 --:--:--    52
+* Connection #0 to host 127.0.0.1 left intact
+--- Key fetch failed, retrying in 5s ---
+```
+
+checking the trustee logs with `make trustee-logs`
+
+```
+2026-08-12T21:49:22.652521Z  INFO Intel TDX: verifier::tdx: Quote DCAP check succeeded.
+2026-08-12T21:49:22.652541Z  INFO Intel TDX: verifier::tdx: MRCONFIGID check succeeded.
+2026-08-12T21:49:22.652600Z  INFO Intel TDX: verifier::tdx: EventLog integrity check succeeded.
+2026-08-12T21:49:22.652661Z  INFO attestation_service: Verifier/endorsement check passed. tee=Tdx tee_class="cpu"
+2026-08-12T21:49:22.879851Z  INFO attestation_service: Verifier/endorsement check passed. tee=Nvidia tee_class="gpu"
+2026-08-12T21:49:22.881498Z  WARN Regorus: attestation_service::ear_token::broker: No reference value found for the given id: tdvfkernel, use NULL as the returned value
+2026-08-12T21:49:22.882668Z  WARN Regorus: attestation_service::ear_token::broker: No reference value found for the given id: allowed_vbios_versions, use NULL as the returned value
+2026-08-12T21:49:22.882695Z  INFO Regorus: policy_engine::policy::rego: No claim data.policy.extensions found in policy.
+2026-08-12T21:49:22.883193Z  INFO actix_web::middleware::logger: 10.128.0.185 "POST /kbs/v0/attest HTTP/1.1" 200 40287 "-" "attestation-agent-kbs-client/0.1.0" 0.249171
+2026-08-12T21:49:22.894278Z ERROR kbs::error: PolicyDeny
+2026-08-12T21:49:22.894306Z  INFO actix_web::middleware::logger: 10.128.0.185 "GET /kbs/v0/resource/default/seismic-interpretation/model-key HTTP/1.1" 401 110 "-" "attestation-agent-kbs-client/0.1.0" 0.001586
+2026-08-12T21:49:22.914750Z  INFO actix_web::middleware::logger: 10.128.0.185 "POST /kbs/v0/auth HTTP/1.1" 200 74 "-" "attestation-agent-kbs-client/0.1.0" 0.000340
+```
+
+we can see the request for the model key being denied.
+
+Going back to look earlier the app logs we can see that the cpu attestation failed:
+
+```
+    Trustworthiness vector:
+        executables              4  (affirming)
+        hardware                 2  (affirming)
+        configuration           36  (NON-AFFIRMING  <-- blocking)
+    TDX / CPU Evidence:
+        init_data                      36e67cfd30adc2aa1f4c5fad46e28595ffec0ff6232af2b62a132b2dff2bd69b00000000000000000000000000000000
+```
+
+due to the rule we added to the configuration policy which requies the init-data to match the value we registered earlier.
+
+Revert the changes we made to  policies/policy-locked.rego, and  scripts/build-initdata.py with:
+
+```
+git checkout scripts/policy-locked.rego
+git checkout scripts/build-initdata.py
+```
 
 ### Optional: Encrypt and publish your own model — model owner
 
