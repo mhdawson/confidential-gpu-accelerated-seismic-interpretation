@@ -1120,11 +1120,7 @@ oc annotate route kbs-route -n trustee-operator-system \
 
 The default Trustee CPU attestation policy requires `tcb_status == "UpToDate"` before it will set the hardware trustworthiness claim to affirming and release the model key. In practice, Intel issues TCB Recovery events on an irregular schedule, and a platform whose TCB was fully up to date when this quickstart was written may show `OutOfDate` by the time you run it because a newer TCB version has been published since the platform was last updated. In production this default makes sense, but for the quickstart we chose to patch the policy to allow TCB versions after a fixed date in order to minimize the chances you need to upgrade your firmware to run the quickstart.
 
-The patched policy replaces the `UpToDate` requirement with a minimum acceptable TCB date (`2026-02-11`). Platforms certified to that TCB level or newer will pass the hardware check regardless of whether a more recent TCB has since been issued. The `tcb_date` is tied to a specific Intel TCB Recovery event and does not change unless the platform firmware is updated; it is therefore a stable, predictable condition to check against. Available TCB dates can be found at:
-
-```
-curl -s https://api.trustedservices.intel.com/tdx/certification/v4/tcbevaluationdatanumbers | jq
-```
+The patched policy replaces the `UpToDate` requirement with a minimum acceptable TCB date (`2026-02-11`). Platforms certified to that TCB level or newer will pass the hardware check regardless of whether a more recent TCB has since been issued. The `tcb_date` is tied to a specific Intel TCB Recovery event and does not change unless the platform firmware is updated; it is therefore a stable, predictable condition to check against.
 
 > **Production note:** For a production deployment, the default requirement of `tcb_status == "UpToDate"` is safer — it ensures the platform is always running the latest certified firmware before releasing the key. The date-based approach is a deliberate relaxation made here to keep the quickstart functional as TCB versions advance.
 
@@ -1154,7 +1150,7 @@ The attestation policy requires the following values in RVPS before it will rele
 
 | Name | What it covers | Varies by |
 |---|---|---|
-| `tdx_pcr08` | Initdata hash — binds the pod to this KBS URL and namespace | Namespace + KBS cert |
+| `tdx_pcr08` | Initdata hash — binds the pod to the KBS URL, KBS TLS cert, namespace, image repos, and exec-deny policy | Namespace, KBS cert, app/model image repos, policy mode |
 | `td_attributes` | TDX TD feature flags (e.g. debug mode disabled) | Hardware / OSC version |
 | `mr_td` | OVMF firmware measurement | OSC version |
 | `xfam` | QEMU CPU feature mask | OSC version / runtime class |
@@ -1163,7 +1159,7 @@ The attestation policy requires the following values in RVPS before it will rele
 | `rtmr_2` | Additional boot measurement | OSC version |
 | `rtmr_3` | Runtime configuration measurement | OSC version |
 
-`tdx_pcr08` is computed at registration time from your namespace and KBS certificate. The TDX hardware measurements are stable for a given OSC version — the Makefile already contains the correct values for OSC **1.13.1** (see the `TDX_MR_TD` block near `KATA_RUNTIME_CLASS` in the Makefile).
+`tdx_pcr08` is computed at registration time from the full initdata blob: it covers the KBS URL, KBS TLS certificate, namespace, app and model image repos, and the exec-deny policy (policy.rego). Any change to any of these requires re-running `make set-rvps-values`. The TDX hardware measurements are stable for a given OSC version — the Makefile already contains the correct values for OSC **1.13.1** (see the `TDX_MR_TD` block near `KATA_RUNTIME_CLASS` in the Makefile).
 
 <details open>
 <summary>Make instructions</summary>
@@ -1235,25 +1231,21 @@ with trustee by running:
 make show-rvps NAMESPACE=$NAMESPACE
 ```
 
-This shows you what would be registered if you ran make show-rvps as well as a check against what
+This shows you what would be registered if you ran make `set-rvps-values` as well as a check against what
 has already been registred.
 
 You should seen an output like the following where in the second section
-is indicates that all values match a registered value except for
+it indicates that all values match a registered value except for
 `mr_seam` that we have not registered for the quickstart because it
 would require that your firmware version match the exact value specified.
 For a production deployment you may want to set it for the maximum level
-of safet` that we have not registered for the quickstart because it
-would require that your firmware version match the exact value specified.
-For a production deployment you may want to set it for the maximum level
-of safety. 
-
+of safety.
 ```
 ========================================================================
  RVPS REFERENCE VALUES
 ========================================================================
 
-?? Would be registered by 'make setup-attestation' =====================
+?? Would be registered by 'make set-rvps-values' =====================
 
   ?  tdx_pcr08       initdata configuration binding
                    SHA256(zeroes32 || SHA256(initdata_toml_bytes))

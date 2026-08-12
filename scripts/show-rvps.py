@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Decode and pretty-print RVPS reference values — both what 'make setup-attestation'
+Decode and pretty-print RVPS reference values — both what 'make set-rvps-values'
 would register and what is currently stored in the trustee ConfigMap.
 
 Shows all known TDX attestation fields with a clear indicator of whether each
@@ -39,7 +39,7 @@ FIELDS = [
         "note":    None,
         "changes": "KBS TLS cert rotates (cert-manager); namespace changes; policy mode "
                    "changes; KBS URL changes",
-        "action":  "make setup-attestation — re-run whenever 'make install' would produce "
+        "action":  "make set-rvps-values — re-run whenever 'make install' would produce "
                    "a different initdata blob",
     },
     {
@@ -49,7 +49,7 @@ FIELDS = [
         "env_key": "TDX_MR_TD",
         "note":    "export TDX_MR_TD from scripts/collect-tdx-measurements.sh",
         "changes": "OSC upgrade that updates the kata TDVF/OVMF binary",
-        "action":  "make collect-tdx-measurements, then make setup-attestation",
+        "action":  "make collect-tdx-measurements, then make set-rvps-values",
     },
     {
         "name":    "xfam",
@@ -58,7 +58,7 @@ FIELDS = [
         "env_key": "TDX_XFAM",
         "note":    "export TDX_XFAM from scripts/collect-tdx-measurements.sh",
         "changes": "very rarely — only if QEMU CPU model or OSC QEMU config changes",
-        "action":  "make collect-tdx-measurements, then make setup-attestation",
+        "action":  "make collect-tdx-measurements, then make set-rvps-values",
     },
     {
         "name":    "rtmr_0",
@@ -67,7 +67,7 @@ FIELDS = [
         "env_key": "TDX_RTMR_0",
         "note":    "export TDX_RTMR_0 from scripts/collect-tdx-measurements.sh",
         "changes": "OSC upgrade that updates TDVF; same cadence as mr_td",
-        "action":  "make collect-tdx-measurements, then make setup-attestation",
+        "action":  "make collect-tdx-measurements, then make set-rvps-values",
     },
     {
         "name":    "rtmr_1",
@@ -76,7 +76,7 @@ FIELDS = [
         "env_key": "TDX_RTMR_1",
         "note":    "export TDX_RTMR_1 from scripts/collect-tdx-measurements.sh",
         "changes": "OSC upgrade that updates the kata guest kernel",
-        "action":  "make collect-tdx-measurements, then make setup-attestation",
+        "action":  "make collect-tdx-measurements, then make set-rvps-values",
     },
     {
         "name":    "rtmr_2",
@@ -85,7 +85,7 @@ FIELDS = [
         "env_key": "TDX_RTMR_2",
         "note":    "export TDX_RTMR_2 from scripts/collect-tdx-measurements.sh",
         "changes": "OSC upgrade that updates kata-agent, CDH, or AA in the initrd",
-        "action":  "make collect-tdx-measurements, then make setup-attestation",
+        "action":  "make collect-tdx-measurements, then make set-rvps-values",
     },
     {
         "name":    "rtmr_3",
@@ -94,7 +94,7 @@ FIELDS = [
         "env_key": "TDX_RTMR_3",
         "note":    "export TDX_RTMR_3 from scripts/collect-tdx-measurements.sh",
         "changes": "only if kata-cc begins using RTMR[3] for runtime measurements",
-        "action":  "make collect-tdx-measurements, then make setup-attestation",
+        "action":  "make collect-tdx-measurements, then make set-rvps-values",
     },
     {
         "name":    "td_attributes",
@@ -103,7 +103,7 @@ FIELDS = [
         "env_key": "TDX_TD_ATTRIBUTES",
         "note":    "export TDX_TD_ATTRIBUTES from scripts/collect-tdx-measurements.sh",
         "changes": "only if QEMU/kata configuration enables or disables debug mode",
-        "action":  "make collect-tdx-measurements, then make setup-attestation; "
+        "action":  "make collect-tdx-measurements, then make set-rvps-values; "
                    "verify bit 0 is 0 before registering",
     },
     {
@@ -114,7 +114,7 @@ FIELDS = [
         "note":    "export TDX_MR_SEAM from scripts/collect-tdx-measurements.sh",
         "changes": "host firmware update that upgrades the Intel TDX module "
                    "(independent of OSC upgrades)",
-        "action":  "make collect-tdx-measurements, then make setup-attestation",
+        "action":  "make collect-tdx-measurements, then make set-rvps-values",
     },
 ]
 
@@ -184,7 +184,7 @@ IND = "                   "   # indent for wrapped continuation lines
 
 # ── Would be registered ───────────────────────────────────────────────────────
 
-print(header("Would be registered by 'make setup-attestation'"))
+print(header("Would be registered by 'make set-rvps-values'"))
 print()
 
 for f in FIELDS:
