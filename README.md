@@ -2069,7 +2069,7 @@ Going back to look earlier the app logs we can see that the cpu attestation fail
 
 This is due to the rule we added to the configuration policy which requies the init-data to match the value we registered earlier. Its good to see
 that it is having the desired effect and the KBS does not release the model key if the init-data does not match what the model owner
-has registered. So while the application deployer can modify the initdata used when the application is deployed, the KBS will not release the model key uunless the initdata matches the initdata specified in the rvps values registered by the model owner.
+has registered. So while the application deployer can modify the initdata used when the application is deployed, the KBS will not release the model key unless the initdata matches the initdata specified in the rvps values registered by the model owner.
 
 Revert the changes we made to  policies/policy-locked.rego, and  scripts/build-initdata.py with:
 
