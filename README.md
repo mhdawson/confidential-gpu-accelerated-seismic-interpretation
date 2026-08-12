@@ -1791,7 +1791,7 @@ and explain how things are working.
 
 ```bash
 POD=$(oc get pod -n seismic-interpretation -l app.kubernetes.io/name=seismic-app -o jsonpath='{.items[0].metadata.name}')
-oc logs -n seismic-interpretation $POD -c app | head -10
+oc logs -n seismic-interpretation $POD -c app
 ```
 
 At the end of the logs you should see the logs confirming that the model key was released to the confidential
@@ -1888,13 +1888,18 @@ GPU attestation:
         x-nvidia-overall-att-result    True
 ```
 
+The entries for both the cpu and gpu should show as `affirming` which confirms the required
+policy for the cpu and gpu were both satisfied.
+
 Confirm the initdata annotation is present and decodes to valid TOML with the KBS URL:
 
 ```bash
 oc get pod -n seismic-interpretation $POD \
     -o jsonpath='{.metadata.annotations.io\.katacontainers\.config\.hypervisor\.cc_init_data}' \
-    | base64 -d | gunzip | grep url
+    | base64 -d | gunzip
 ```
+
+The output should match what we saw earlier when we ran `make show-initdata`.
 
 #### Attempt to access the running container
 
@@ -1903,7 +1908,7 @@ A key property of a confidential container is that even a cluster administrator 
 Try to open a shell in the running pod using the CLI:
 
 ```bash
-POD=$(oc get pod -n $NAMESPACE -l app=seismic-app -o jsonpath='{.items[0].metadata.name}')
+POD=$(oc get pod -n $NAMESPACE -l app.kubernetes.io/name=seismic-app -o jsonpath='{.items[0].metadata.name}')
 oc exec -n $NAMESPACE $POD -c app -- /bin/sh
 ```
 
