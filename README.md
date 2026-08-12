@@ -1962,13 +1962,14 @@ confidential container.
 The default policy used in the quickstart is in [policies/policy-locked.rego](policies/policy-locked.rego) and the line which cause the denial in the policy was `default ExecProcessRequest := false
 ` in the policy.
 
-So let's change the policy. Edit that line in policies/policy-locked.rego to change the line to `default ExecProcessRequest := true`.
+So let's change the policy. We can do that as the application deployer because its specified in the initdata passed when the application is started.
+Edit that line in policies/policy-locked.rego to change the line to `default ExecProcessRequest := true`.
 
 Stop any running instance of the quickstart with `make uninstall` and then start the application again with `make install`. 
 
 You will notice that the app fails to deploy. Look at the events for the pod in the UI and you should see something like this:
 
-![Pod CDH ](cdh-resource-fetch-failed.png)
+![Pod CDH ](docs/images/cdh-resource-fetch-failed.png)
 
 which shows a failure with "Get resource failed"
 
@@ -1978,7 +1979,7 @@ You can get the trustee logs by running
 make trustee-logs
 ```
 
-and you should see an entry like the following which sows that the kbs is refusing to return the image-policy which is needed to check the signatres on the containers. This is due the attestation failure due to the mismatch between the registered initdata and what the container was started with:
+and you should see an entry like the following which shows that the kbs is refusing to return the image-policy which is needed to check the signatres on the containers. This is due the attestation failure due to the mismatch between the registered initdata and what the container was started with:
 
 ```
 2026-08-12T21:29:28.883027Z  INFO Intel TDX: verifier::tdx: Quote DCAP check succeeded.
@@ -1995,7 +1996,7 @@ and you should see an entry like the following which sows that the kbs is refusi
 2026-08-12T21:29:29.134013Z  INFO actix_web::middleware::logger: 10.128.0.183 "POST /kbs/v0/auth HTTP/1.1" 200 74 "-" "attestation-agent-kbs-client/0.1.0" 0.000447
 ```
 
-The deployment fails early as it tries to get the image policy from the KBS, but what about if we remove the image policy which requires signatures froms the initdata?
+The deployment fails early as it tries to get the image policy from the KBS, but what about if we remove the image policy which requires signatures from the initdata?
 
 Do that by removing the [image] and image_security_policy_uri lines in build-initdata.py
 
@@ -2016,7 +2017,8 @@ index ddb729b..6312ef4 100755
 ```
 
 Start and stop the app with `make uninstall` and then `make install` again. This time you should see that the
-deployment gets furhter along and the app tries to start up but the KBS does not release the key with error like this:
+deployment gets further along and the app tries to start up but the KBS does not release the key with error like this which are visible
+in the logs for the app container:
 
 ```
 > GET /cdh/resource/default/seismic-interpretation/model-key HTTP/1.1
@@ -2065,7 +2067,9 @@ Going back to look earlier the app logs we can see that the cpu attestation fail
         init_data                      36e67cfd30adc2aa1f4c5fad46e28595ffec0ff6232af2b62a132b2dff2bd69b00000000000000000000000000000000
 ```
 
-due to the rule we added to the configuration policy which requies the init-data to match the value we registered earlier.
+This is due to the rule we added to the configuration policy which requies the init-data to match the value we registered earlier. Its good to see
+that it is having the desired effect and the KBS does not release the model key if the init-data does not match what the model owner
+has registered. So while the application deployer can modify the initdata used when the application is deployed, the KBS will not release the model key uunless the initdata matches the initdata specified in the rvps values registered by the model owner.
 
 Revert the changes we made to  policies/policy-locked.rego, and  scripts/build-initdata.py with:
 
@@ -2073,6 +2077,8 @@ Revert the changes we made to  policies/policy-locked.rego, and  scripts/build-i
 git checkout scripts/policy-locked.rego
 git checkout scripts/build-initdata.py
 ```
+
+before moving on to the next sections.
 
 ### Optional: Encrypt and publish your own model — model owner
 
