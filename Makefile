@@ -140,9 +140,13 @@ help:
 	@echo "                               measurements (mr_td, xfam, rtmr_0-3, td_attributes, mr_seam)"
 	@echo "                               Paste the printed Makefile variables here; re-run after OSC upgrades"
 	@echo "                               (requires NAMESPACE; uses KATA_RUNTIME_CLASS)"
-	@echo "    setup-attestation        - Register model key, cosign key, and image policy with KBS;"
-	@echo "                               compute and register tdx_pcr08 RVPS reference value"
-	@echo "                               (requires NAMESPACE, MODEL_ENCRYPTION_KEY, model-owner-verification-keys/cosign.pub)"
+	@echo "    set-rvps-values          - Compute and register tdx_pcr08 and TDX hardware measurements in RVPS;"
+	@echo "                               restarts Trustee to pick up the updated configmap"
+	@echo "                               (requires NAMESPACE; export TDX_MR_TD/XFAM/RTMR_* for full attestation)"
+	@echo "    register-secrets-with-kbs - Register model key, cosign key, and image policy with KBS"
+	@echo "                               via kbsSecretResources (requires NAMESPACE, MODEL_ENCRYPTION_KEY,"
+	@echo "                               model-owner-verification-keys/cosign.pub)"
+	@echo "    setup-attestation        - Convenience target: runs set-rvps-values then register-secrets-with-kbs"
 	@echo "    validate-trustee-certificate - Verify the cert in trusteeconfig-https-cert-secret matches what"
 	@echo "                               KBS is currently serving; fails if cert-manager has rotated the cert"
 	@echo "                               since the last 'make install' (which would break TLS in the kata VM)"
@@ -150,7 +154,7 @@ help:
 	@echo "                               aa.toml, cdh.toml, policy.rego, SHA-256, and PCR8 hash"
 	@echo "                               (requires NAMESPACE; uses POLICY_MODE, APP_IMG, MODEL_IMG)"
 	@echo "    show-rvps                - Print RVPS reference values: what would be registered by"
-	@echo "                               setup-attestation vs what is currently in the ConfigMap"
+	@echo "                               set-rvps-values vs what is currently in the ConfigMap"
 	@echo "                               (requires NAMESPACE; export TDX_MR_TD/XFAM/RTMR_1/RTMR_2)"
 	@echo "    clear-rvps               - Remove all registered RVPS reference values and restart Trustee"
 	@echo "                               WARNING: attestation will fail for all pods until re-registered"
@@ -1395,16 +1399,14 @@ collect-tdx-measurements:
 	@[ -n "$$NAMESPACE" ] || (echo "Error: NAMESPACE is not set"; exit 1)
 	bash scripts/collect-tdx-measurements.sh "$(NAMESPACE)" "$(KATA_RUNTIME_CLASS)"
 
-.PHONY: setup-attestation
-setup-attestation:
+.PHONY: set-rvps-values
+set-rvps-values:
 	@[ -n "$$NAMESPACE" ] || (echo "Error: NAMESPACE is not set"; exit 1)
-	@[ -n "$$MODEL_ENCRYPTION_KEY" ] || (echo "Error: MODEL_ENCRYPTION_KEY is not set"; exit 1)
-	@[ -f model-owner-verification-keys/cosign.pub ] || (echo "Error: model-owner-verification-keys/cosign.pub not found — run 'make generate-model-owner-keys' first"; exit 1)
 	@if [ -z "$(TDX_MR_TD)" ]; then \
 	    echo "WARNING: TDX hardware measurements are not set."; \
 	    echo "         Only tdx_pcr08 will be registered — attestation will fail until"; \
 	    echo "         you run scripts/collect-tdx-measurements.sh, export the printed"; \
-	    echo "         values, and re-run 'make setup-attestation'."; \
+	    echo "         values, and re-run 'make set-rvps-values'."; \
 	    echo "         Required: TDX_MR_TD TDX_XFAM TDX_RTMR_0 TDX_RTMR_1 TDX_RTMR_2"; \
 	    echo "         Optional: TDX_RTMR_3 TDX_TD_ATTRIBUTES TDX_MR_SEAM"; \
 	fi
@@ -1438,6 +1440,16 @@ setup-attestation:
 	    -n trustee-operator-system \
 	    --type merge \
 	    -p "$$PATCH"
+	@echo "Restarting Trustee to pick up the updated RVPS configmap..."
+	@oc rollout restart deployment/trustee-deployment -n trustee-operator-system
+	@oc rollout status deployment/trustee-deployment -n trustee-operator-system --timeout=2m
+	@echo "RVPS reference values registered for namespace $(NAMESPACE)."
+
+.PHONY: register-secrets-with-kbs
+register-secrets-with-kbs:
+	@[ -n "$$NAMESPACE" ] || (echo "Error: NAMESPACE is not set"; exit 1)
+	@[ -n "$$MODEL_ENCRYPTION_KEY" ] || (echo "Error: MODEL_ENCRYPTION_KEY is not set"; exit 1)
+	@[ -f model-owner-verification-keys/cosign.pub ] || (echo "Error: model-owner-verification-keys/cosign.pub not found — run 'make generate-model-owner-keys' first"; exit 1)
 	@echo "Registering KBS secrets for namespace $(NAMESPACE) via kbsSecretResources..."
 	@set -e; \
 	POLICY=$$(printf '{"default":[{"type":"reject"}],"transports":{"docker":{"%s":[{"type":"sigstoreSigned","keyPath":"kbs:///default/%s/cosign-key"}],"%s":[{"type":"sigstoreSigned","keyPath":"kbs:///default/%s/cosign-key"}]}}}' \
@@ -1454,10 +1466,13 @@ setup-attestation:
 	    -n trustee-operator-system \
 	    --type merge \
 	    -p "{\"spec\":{\"kbsSecretResources\":$$RESOURCES}}"
-	@echo "Restarting Trustee to pick up the updated RVPS configmap..."
+	@echo "Restarting Trustee to pick up the updated KBS secrets..."
 	@oc rollout restart deployment/trustee-deployment -n trustee-operator-system
 	@oc rollout status deployment/trustee-deployment -n trustee-operator-system --timeout=2m
-	@echo "Attestation secrets and RVPS reference values registered for namespace $(NAMESPACE)."
+	@echo "KBS secrets registered for namespace $(NAMESPACE)."
+
+.PHONY: setup-attestation
+setup-attestation: set-rvps-values register-secrets-with-kbs
 
 .PHONY: show-initdata
 show-initdata:
@@ -1477,7 +1492,7 @@ show-initdata:
 .PHONY: clear-rvps
 clear-rvps:
 	@echo "WARNING: This will remove all RVPS reference values. Attestation will fail for all"
-	@echo "         pods until 'make setup-attestation' is run again. Press Ctrl-C to abort."
+	@echo "         pods until 'make set-rvps-values' is run again. Press Ctrl-C to abort."
 	@sleep 5
 	@oc patch configmap trusteeconfig-rvps-reference-values \
 	    -n trustee-operator-system \

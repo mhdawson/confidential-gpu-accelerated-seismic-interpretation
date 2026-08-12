@@ -1134,7 +1134,7 @@ The attestation policy requires the following values in RVPS before it will rele
 To automatically register RVPS reference values:
 
 ```bash
-make setup-attestation NAMESPACE=$NAMESPACE
+make set-rvps-values NAMESPACE=$NAMESPACE
 ```
 
 </details>
@@ -1187,7 +1187,7 @@ oc rollout status deployment/trustee-deployment -n trustee-operator-system --tim
 > 1. Run `./scripts/collect-tdx-measurements.sh $NAMESPACE` — it launches a temporary kata-cc probe pod, extracts the measurements, and deletes the pod when done.
 > 2. The script prints the OSC version, a Makefile variable block, and an `export` block.
 > 3. Paste the Makefile block into the Makefile (near `KATA_RUNTIME_CLASS`) and update the OSC version comment.
-> 4. Source the `export` lines into your shell, then run `make setup-attestation NAMESPACE=$NAMESPACE` as normal.
+> 4. Source the `export` lines into your shell, then run `make set-rvps-values NAMESPACE=$NAMESPACE` as normal.
 
 </details>
 
@@ -1213,7 +1213,7 @@ MODEL_ENCRYPTION_KEY=7f27f40d746b5d92c2d2fe744096b0712ef9951955de9773b3eb20e2be0
 To automatically register app-specific KBS secrets:
 
 ```bash
-make setup-attestation NAMESPACE=$NAMESPACE
+make register-secrets-with-kbs NAMESPACE=$NAMESPACE MODEL_ENCRYPTION_KEY=$MODEL_ENCRYPTION_KEY
 ```
 
 </details>
