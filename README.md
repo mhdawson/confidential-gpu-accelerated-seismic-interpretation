@@ -39,6 +39,7 @@ AI-powered classification from North Sea seismic data — running with a three-f
     - [View results](#view-results)
   - [Verify confidential execution](#verify-confidential-execution)
     - [Attempt to access the running container](#attempt-to-access-the-running-container)
+    - [Try to change the policy](#try-to-change-the-policy)
   - [Optional: Encrypt and publish your own model — model owner](#optional-encrypt-and-publish-your-own-model--model-owner)
   - [Optional: Build and publish your own application — model owner](#optional-build-and-publish-your-own-application--model-owner)
   - [What you've accomplished](#what-youve-accomplished)
