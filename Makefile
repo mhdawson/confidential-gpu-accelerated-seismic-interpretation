@@ -1262,6 +1262,13 @@ setup-dcap:
 	else \
 	    echo "Installing Intel TDX DCAP Operator..."; \
 	    oc apply -f helm/osc/templates/intel-dcap-tdxqgs-subscription.yaml; \
+	    echo "Waiting for DCAP InstallPlan..."; \
+	    until oc get installplan -n intel-dcap -o jsonpath='{.items[*].spec.clusterServiceVersionNames[*]}' 2>/dev/null \
+	            | grep -q "intel-tdx-dcap-operator"; do sleep 5; done; \
+	    DCAP_INSTALL_PLAN=$$(oc get installplan -n intel-dcap -o json \
+	        | python3 -c "import sys,json; items=json.load(sys.stdin)['items']; print(next(ip['metadata']['name'] for ip in items if 'intel-tdx-dcap-operator' in ' '.join(ip['spec'].get('clusterServiceVersionNames',[]))))"); \
+	    oc patch installplan "$$DCAP_INSTALL_PLAN" -n intel-dcap \
+	        --type merge --patch '{"spec":{"approved":true}}'; \
 	    until oc get csv -n intel-dcap 2>/dev/null \
 	            | grep -q "intel-tdx-dcap-operator.*Succeeded"; do sleep 10; done; \
 	    echo "Intel TDX DCAP Operator ready."; \
