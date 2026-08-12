@@ -36,7 +36,8 @@ AI-powered classification from North Sea seismic data — running with a three-f
     - [Upload seismic data](#upload-seismic-data)
     - [Run classification](#run-classification)
     - [View results](#view-results)
-  - [Verify confidential execution (Optional)](#verify-confidential-execution-optional)
+  - [Verify confidential execution](#verify-confidential-execution)
+    - [Attempt to access the running container](#attempt-to-access-the-running-container)
   - [Optional: Encrypt and publish your own model — model owner](#optional-encrypt-and-publish-your-own-model--model-owner)
   - [Optional: Build and publish your own application — model owner](#optional-build-and-publish-your-own-application--model-owner)
   - [What you've accomplished](#what-youve-accomplished)
@@ -1768,19 +1769,7 @@ The UI should look like this after you have requested a prection:
 
 ![App UI](docs/images/app-ui.png)
 
-### Verify confidential execution (Optional)
-
-Confirm KBS is running and the app-specific secrets are registered:
-
-```bash
-# KBS pod is Running
-oc get pods -n trustee-operator-system
-
-# Secrets registered under the deployment namespace
-oc exec -n trustee-operator-system deployment/trustee-deployment -- \
-    ls /opt/confidential-containers/kbs/repository/$NAMESPACE/
-# expect: conf-seismic-cosign-key  conf-seismic-image-policy  conf-seismic-model-key
-```
+### Verify confidential execution
 
 To confirm that attestation succeeded and the model key was fetched from KBS, inspect the app container logs 
 as shown below.
@@ -1930,6 +1919,18 @@ Try the same through the OpenShift web console:
 ![Terminal denied](docs/images/terminal-denied.png)
 
 This confirms that the Kata agent exec-deny policy prevents anyone — including cluster administrators — from injecting a shell or additional process into the running container. The only code that runs inside the Trust Domain is the cosign-signed app image that passed the KBS attestation check.
+
+#### Try to change the policy
+
+In the previous section you attempted to exec into the container but were denied by the policy was set for the
+confidential container.
+
+The default policy used in the quickstart is in [policies/policy-locked.rego](policies/policy-locked.rego) and more specifically the line `default ExecProcessRequest := false
+` in the policy.
+
+So let's change the policy. Edit that line in policies/policy-locked.rego to change the line to `default ExecProcessRequest := false`.
+
+Stop any running instance of the quickstart with `make uninstall` and then start the application again with `make install`
 
 ### Optional: Encrypt and publish your own model — model owner
 
