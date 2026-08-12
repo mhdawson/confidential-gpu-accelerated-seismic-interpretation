@@ -144,11 +144,15 @@ flowchart TB
 A containerised web application running on OpenShift that:
 
 1. Pulls an encrypted ModelCar OCI image from `quay.io/rh-ai-quickstart/conf-gpu-accel-seismic-interp-model:v1`
-2. Verifies a three-factor attestation policy via the Key Broker Server — the application container (`conf-gpu-accel-seismic-interp-app:v1`) must be cosign-signed by the model owner, the GPU must be in NVIDIA CC mode, and the CPU must be in a hardware TEE (Intel® TDX or AMD SEV-SNP) — and receives the AES-256-CBC decryption key only if all three pass
+2. Verifies a three-factor attestation policy via the Key Broker Server — the application container (`conf-gpu-accel-seismic-interp-app`) must be cosign-signed by the model owner, the GPU must be in NVIDIA CC mode, and the CPU must be in a hardware TEE (Intel® TDX or AMD SEV-SNP) — and receives the AES-256-CBC decryption key only if all three pass
 3. Decrypts the model weights inside the hardware Trust Domain — in encrypted memory
 4. Presents a browser UI where a user uploads a `.npy` seismic section (depth × crossline, float32)
 5. Runs U-Net ResNet-50 inference on a GPU, classifying every pixel as one of six North Sea rock types
 6. Displays a colour-coded facies classification alongside the seismic input in the browser
+
+The following an example of the what the app looks like:
+
+![App UI](docs/images/app-ui.png)
 
 #### Key technologies you'll learn
 
@@ -1281,7 +1285,10 @@ oc new-project $NAMESPACE
 make install NAMESPACE=$NAMESPACE
 ```
 
-This fetches the KBS TLS certificate from the cluster, builds the initdata blob (AA/CDH configuration for the kata VM), and deploys the app via Helm. On startup the pod goes through the following sequence inside the kata VM:
+This fetches the KBS TLS certificate from the cluster, builds the initdata blob (AA/CDH configuration for the kata VM), and deploys the app via Helm.
+The deployment can make 5 or more minutes and you may see logs like "Error: context deadline exeeded" as the app image is quite large and it must be pulled inside the confidential VM. Despite these logs the application will deploy after the required time to pull and start the container in the confidentialvirtual machine
+
+On startup the pod goes through the following sequence inside the kata VM:
 
 1. **Image pull (before init containers)**: the Confidential Data Hub (CDH) fetches the image verification policy from KBS at `kbs:///default/$NAMESPACE/image-policy`. The kata guest's image pull library (`image-rs`) uses this policy to verify each container image's cosign signature against the model owner's public key stored at `kbs:///default/$NAMESPACE/cosign-key` before allowing the pull to proceed. An unsigned or incorrectly signed image is rejected here — the pod never starts.
 
