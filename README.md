@@ -1305,7 +1305,7 @@ oc get pods -n seismic-interpretation -w
 #### Step 3: Get the application URL
 
 ```bash
-oc get route seismic-app -n seismic-interpretation -o jsonpath='{.spec.host}'
+echo "https://$(oc get route seismic-app -n $NAMESPACE -o jsonpath='{.spec.host}')"
 ```
 
 Open the printed URL in your browser.
@@ -1383,13 +1383,6 @@ Loading model from /models-cache/dutchf3_unet_final.pth ...
 Model ready.
 ```
 
-Confirm the model decryption key is not present as an environment variable:
-
-```bash
-oc exec -n seismic-interpretation $POD -c app -- env | grep MODEL
-# expect: only MODEL_PATH — no MODEL_ENCRYPTION_KEY
-```
-
 Confirm the initdata annotation is present and decodes to valid TOML with the KBS URL:
 
 ```bash
@@ -1405,7 +1398,8 @@ A key property of a confidential container is that even a cluster administrator 
 Try to open a shell in the running pod using the CLI:
 
 ```bash
-oc exec -n seismic-interpretation $POD -c app -- /bin/sh
+POD=$(oc get pod -n $NAMESPACE -l app=seismic-app -o jsonpath='{.items[0].metadata.name}')
+oc exec -n $NAMESPACE $POD -c app -- /bin/sh
 ```
 
 **Expected outcome:**
