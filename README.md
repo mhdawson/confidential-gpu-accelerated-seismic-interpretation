@@ -1764,6 +1764,10 @@ The output image shows two panels side by side:
 
 Click **Clear** to reset and upload a different section.
 
+The UI should look like this after you have requested a prection:
+
+![App UI](docs/images/app-ui.png)
+
 ### Verify confidential execution (Optional)
 
 Confirm KBS is running and the app-specific secrets are registered:
