@@ -1,6 +1,6 @@
-# Confidential GPU-Accelerated Seismic Interpretation
+# Deploy Confidential GPU-Accelerated Seismic Interpretation
 
-AI-powered classification from North Sea seismic data — running within a confidential container on OpenShift AI.
+AI-powered classification from North Sea seismic data — run this quickstart within a confidential container on Red Hat® OpenShift® AI.
 
 ## Table of contents
 
@@ -89,7 +89,7 @@ AI-driven seismic facies classification changes this:
 
 In a conventional container deployment, the cluster operator controls everything: the host OS, the container runtime, and the network. Any workload running on their cluster is ultimately visible to them — they can inspect container memory, attach a debugger, or intercept traffic. Trusting a workload therefore means trusting the operator of the cluster it runs on. This is the model most software assumes, and it is why sensitive AI inference is typically restricted to clusters that the data owner fully controls.
 
-Confidential computing breaks this assumption. The hardware Trust Domain (Intel® TDX or AMD SEV-SNP) is enforced by the CPU itself — the host OS and hypervisor cannot read or modify memory inside it, regardless of what privileges they hold. The model decryption key is held by Trustee, which runs on a separate trusted cluster and releases the key only after independently verifying cryptographic evidence produced inside the TEE. Trustee does not ask the cluster whether it is trustworthy — it verifies the hardware directly. This means the workload cluster can be considered fully untrusted: even if an attacker controls the entire cluster, they cannot forge a valid CPU attestation quote, cannot fake the GPU Confidential Computing mode report, and cannot produce a valid cosign signature for the application image. Without all three, Trustee will not release the key, and the model cannot be decrypted.
+Confidential computing breaks this assumption. The hardware Trust Domain (Intel® TDX or AMD SEV-SNP) is enforced by the CPU itself — the host OS and hypervisor cannot read or modify memory inside it, regardless of what privileges they hold. The model decryption key is held by Red Hat® build of Trustee, which runs on a separate trusted cluster and releases the key only after independently verifying cryptographic evidence produced inside the TEE. Trustee does not ask the cluster whether it is trustworthy — it verifies the hardware directly. This means the workload cluster can be considered fully untrusted: even if an attacker controls the entire cluster, they cannot forge a valid CPU attestation quote, cannot fake the GPU Confidential Computing mode report, and cannot produce a valid cosign signature for the application image. Without all three, Trustee will not release the key, and the model cannot be decrypted.
 
 Everything that touches sensitive data runs inside the secure VM, and none of it can be influenced by the untrusted cluster. The kata VM boots its own isolated guest kernel — separate from the host kernel that OpenShift controls — and every component inside it is part of the attestation measurement. The kata agent, which controls what processes run inside the VM, is supplied via the initdata blob whose hash KBS verifies. The Confidential Data Hub, which fetches the decryption key from KBS, runs inside the TEE and communicates with KBS over a TLS channel that the host network stack cannot intercept. The application container image is verified by cosign as part of attestation, so the cluster cannot substitute a different image without breaking the signature check. The cluster can schedule the pod and stop it, but it cannot change what runs inside the VM, modify the kata-agent policy, intercept the key in transit, or read the decrypted model from memory. The only role the untrusted cluster plays is to start the VM — everything after that is under hardware enforcement.
 
@@ -161,7 +161,7 @@ A containerised web application running on OpenShift that:
 
 The following is an example of what the app looks like:
 
-![App UI](docs/images/app-ui.png)
+![Gradio web UI showing a seismic section input on the left and a colour-coded predicted facies classification on the right](docs/images/app-ui.png)
 
 #### Key technologies you'll learn
 
@@ -180,7 +180,7 @@ The following is an example of what the app looks like:
 - [Cosign / Sigstore](https://docs.sigstore.dev/cosign/overview/) — container image signing, verified as part of the KBS attestation policy
 
 **Platform**
-- [Red Hat OpenShift](https://www.redhat.com/en/technologies/cloud-computing/openshift) with the OpenShift sandboxed containers operator
+- [Red Hat® OpenShift®](https://www.redhat.com/en/technologies/cloud-computing/openshift) with the Red Hat® OpenShift® Sandboxed Containers operator
 - NVIDIA GPU with Confidential Computing mode support (H100, H200, B100 and later) with physical GPU (`pgpu`) passthrough and NVIDIA CC mode enabled
 
 **Application**
@@ -254,7 +254,7 @@ It is recommended that this quickstart only be deployed in a cluster not being u
 | Component | Minimum | Notes |
 |---|---|---|
 | GPU | NVIDIA GPU with Confidential Computing mode support (e.g. H100, H200, B100) | Hopper architecture and later support NVIDIA CC mode and NRAS attestation. Consumer GPUs (RTX 3090, RTX 4090) and older data center GPUs (A100) do not support CC mode and cannot pass the NVIDIA attestation check. |
-| CPU | Intel® Xeon 5th Gen+ (Emerald Rapids) with TDX, or AMD EPYC 9004 series (Genoa) with SEV-SNP | TEE must be enabled in the BIOS. Earlier CPU generations may not support TDX or SEV-SNP. |
+| CPU | Intel® Xeon Scalable 4th Gen+ (Sapphire Rapids or later) with TDX, or AMD EPYC 9004 series (Genoa) with SEV-SNP | TEE must be enabled in the BIOS. TDX was introduced in 4th Gen Xeon Scalable (Sapphire Rapids). |
 | RAM | 128GB | The kata VM takes 24GB, OCP control plane requires ~32GB, and GPU/OSC/Trustee system pods consume additional memory. 64GB is insufficient in practice. |
 | Storage | 50GB | For ModelCar image cache |
 
@@ -1618,8 +1618,8 @@ policy_data := {
                 }
             },
             "storages": [
-                {"driver": "image_guest_pull", "source": "quay.io/midawson/conf-gpu-accel-seismic-interp-deepseismic-model:"},
-                {"driver": "image_guest_pull", "source": "quay.io/midawson/conf-gpu-accel-seismic-interp-deepseismic-model@"},
+                {"driver": "image_guest_pull", "source": "quay.io/rh-ai-quickstart/conf-gpu-accel-seismic-interp-deepseismic-model:"},
+                {"driver": "image_guest_pull", "source": "quay.io/rh-ai-quickstart/conf-gpu-accel-seismic-interp-deepseismic-model@"},
                 {"driver": "ephemeral", "source": "tmpfs"}
             ]
         },
@@ -1630,8 +1630,8 @@ policy_data := {
                 }
             },
             "storages": [
-                {"driver": "image_guest_pull", "source": "quay.io/midawson/conf-gpu-accel-seismic-interp-deepseismic-app:"},
-                {"driver": "image_guest_pull", "source": "quay.io/midawson/conf-gpu-accel-seismic-interp-deepseismic-app@"},
+                {"driver": "image_guest_pull", "source": "quay.io/rh-ai-quickstart/conf-gpu-accel-seismic-interp-deepseismic-app:"},
+                {"driver": "image_guest_pull", "source": "quay.io/rh-ai-quickstart/conf-gpu-accel-seismic-interp-deepseismic-app@"},
                 {"driver": "ephemeral", "source": "tmpfs"}
             ]
         }
@@ -1751,7 +1751,7 @@ On startup the pod goes through the following sequence inside the kata VM:
 Wait for both init containers to complete and the app container to reach `Running`:
 
 ```bash
-oc get pods -n seismic-interpretation -w
+oc get pods -n $NAMESPACE -w
 ```
 
 #### Step 3: Get the application URL
@@ -1806,14 +1806,14 @@ Click **Clear** to reset and upload a different section.
 
 The UI should look like this after you have requested a prediction:
 
-![App UI](docs/images/app-ui.png)
+![Gradio web UI showing a seismic section input on the left and a colour-coded predicted facies classification on the right](docs/images/app-ui.png)
 
 ### Verify confidential execution
 
 To confirm that attestation succeeded and the model key was fetched from KBS, inspect the app container logs 
 as shown below.
 
-** NOTE: ** In a real deployment you may choose to disable logs in the policy in order to avoid the possibility
+**NOTE:** In a real deployment you may choose to disable logs in the policy in order to avoid the possibility
 of the container leaking information. We've left them enabled in the quickstart so that we can more easily show
 and explain how things are working.
 
@@ -1955,7 +1955,7 @@ Try the same through the OpenShift web console:
 **Expected outcome:**
 - The terminal fails to connect and displays: `"ExecProcessRequest is blocked by policy"`
 
-![Terminal denied](docs/images/terminal-denied.png)
+![Terminal output showing oc exec blocked with ExecProcessRequest is blocked by policy](docs/images/terminal-denied.png)
 
 This confirms that the Kata agent exec-deny policy prevents anyone — including cluster administrators — from injecting a shell or additional process into the running container. The only code that runs inside the Trust Domain is the cosign-signed app image that passed the KBS attestation check.
 
@@ -1973,7 +1973,7 @@ Stop any running instance of the quickstart with `make uninstall NAMESPACE=$NAME
 
 You will notice that the app fails to deploy. Look at the events for the pod in the UI and you should see something like this:
 
-![Pod CDH ](docs/images/cdh-resource-fetch-failed.png)
+![Pod events showing CDH resource fetch failed when KBS rejects the attestation request](docs/images/cdh-resource-fetch-failed.png)
 
 which shows a failure with "Get resource failed"
 
@@ -2112,7 +2112,7 @@ Try to change the arguments so that we would run `app/export.py` instead of `app
 Start and stop the app with `make uninstall NAMESPACE=$NAMESPACE` and then `make install NAMESPACE=$NAMESPACE` again. This time you should see that the
 application fails to deploy with an error like this:
 
-![Denied with argument change](docs/images/args-modification-denied.png)
+![Pod failing to start because the Kata policy denied the modified container arguments](docs/images/args-modification-denied.png)
 
 This is because in [policies/policy-locked.rego](policies/policy-locked.rego) we only whitelist the
 allowed parameters/command line that can be used in this section:
@@ -2221,7 +2221,7 @@ make install APP_IMG=quay.io/ubi9/ubi9-minimal:latest  NAMESPACE=$NAMESPACE
 You'll see that the app image is not pulled and there will be an error like:
 
 
-![Fails with different container](docs/images/fails-with-different-container.png)
+![Pod failing to start because the unsigned replacement container image was rejected by the KBS image policy](docs/images/fails-with-different-container.png)
 
 The failure is because the policy includes an image policy which we set as part
 of the trustee configuration, you can get this policy by running
@@ -2295,7 +2295,7 @@ make install APP_IMG=quay.io/rh-ai-quickstart/conf-gpu-accel-seismic-interp-deep
 
 You should see that the app container is not pulled, with an error that says `Image policy rejected: Denied by policy: rejected by sigstoreSigned rule` like this:
 
-![Unsigned image fails](docs/images/sigstore-signed-denied.png)
+![Image pull error showing the sigstore signed policy rejected an unsigned container image](docs/images/sigstore-signed-denied.png)
 
 This failure is because we've configured the image policy in trustee such that the image must be signed by a key the model
 owner registered in trustee. From the image policy:
@@ -2483,19 +2483,11 @@ Then re-run the deploy steps from [Step 2](#step-2-deploy-the-application) onwar
 ### What you've accomplished
 
 **Deployed a fully attested confidential AI pipeline for geoscience:**
-- ✓ The model decryption key was released only after three independent attestation checks passed: the application container (`conf-gpu-accel-seismic-interp-app:v1`) cosign signature verified by the model owner's key, NVIDIA CC mode confirmed on the GPU, and CPU TEE verified (Intel® TDX or AMD SEV-SNP)
+- ✓ The model decryption key was released only after three independent attestation checks passed: the application container (`conf-gpu-accel-seismic-interp-app`) cosign signature verified by the model owner's key, NVIDIA CC mode confirmed on the GPU, and CPU TEE verified (Intel® TDX or AMD SEV-SNP)
 - ✓ The model weights were encrypted at rest in quay.io and decrypted only inside the hardware Trust Domain — never exposed on disk or in untrusted memory
 - ✓ Seismic data uploaded by the user was processed entirely within TEE-encrypted memory
 - ✓ Produced a rock type classification for a seismic section in seconds
-
-**Demonstrated GPU value on a real workload:**
-- ✓ Inference ran in approximately 1–2 minutes at 80–100% GPU utilisation via PCI passthrough into the hardware Trust Domain
-- ✓ The same classification would take hours on CPU
-
-**Connected AI output to business decisions:**
-- ✓ The facies output directly identifies reservoir, seal, and overburden rock — the key inputs to well placement decisions worth tens of millions of dollars per well
-- ✓ Results are immediately viewable in the browser
-- ✓ The same pipeline runs on any `.npy` seismic section with no code changes
+- ✓ Verified that the protections cannot be circumvented: exec and terminal access into the container are blocked by the Kata agent policy, changing the policy or initdata causes KBS to deny key release, substituting a different or unsigned container image fails attestation, and the model key is never accessible outside the Trust Domain
 
 ### Delete
 
@@ -2505,7 +2497,7 @@ Remove the application — no cluster-admin required:
 
 ```bash
 make uninstall NAMESPACE=$NAMESPACE
-oc delete project seismic-interpretation
+oc delete project $NAMESPACE
 ```
 
 #### Cluster-wide resources (cluster-admin)
@@ -2547,7 +2539,7 @@ oc delete namespace trustee-operator-system
 
 ---
 
-## Reference
+## References
 
 ### Product documentation
 
@@ -2559,11 +2551,9 @@ oc delete namespace trustee-operator-system
 
 ## Tags
 
-* **Title:** Confidential GPU-Accelerated Seismic Interpretation
-* **Description:** AI-powered classification from North Sea seismic data — running within a confidential container on OpenShift AI.
+* **Title:** Deploy Confidential GPU-Accelerated Seismic Interpretation
+* **Description:** AI-powered classification from North Sea seismic data — run this quickstart within a confidential container on Red Hat® OpenShift® AI.
 * **Industry:** Utilities
 * **Product:** Red Hat OpenShift AI, OpenShift Sandboxed Containers, Red Hat build of Trustee
 * **Use case:** Predictive modelling, seismic facies classification, confidential AI inference, encrypted model distribution
 * **Contributor org:** Red Hat
-
-**Thank you for using the Seismic Interpretation Quickstart!**
