@@ -248,7 +248,7 @@ flowchart LR
 
 ### Minimum hardware requirements
 
-It is recommended that this quickstart only be deployed in cluster not being used concurrently for other deployments. Installation requires multiple node reboots and applies configuration that may be incompatible with deployments not using confidential containers.
+It is recommended that this quickstart only be deployed in a cluster not being used concurrently for other deployments. Installation requires multiple node reboots and applies configuration that may be incompatible with deployments not using confidential containers.
 
 | Component | Minimum | Notes |
 |---|---|---|
@@ -259,7 +259,7 @@ It is recommended that this quickstart only be deployed in cluster not being use
 
 **NOTE:** A CPU TEE (Intel® TDX or AMD SEV-SNP) and NVIDIA CC mode are **both** hard requirements — the Key Broker Server will not release the model decryption key unless all three attestation checks pass.
 
-**NOTE:** At this point in time the quickstart has only been validated to work with Intel TDX; validation with AMD SEV-SNP is a work in progress
+**NOTE:** At this point in time the quickstart has only been validated to work with Intel TDX; validation with AMD SEV-SNP is a work in progress.
 
 ### Minimum software requirements
 
@@ -343,7 +343,7 @@ The default namespace used in this quickstart is `seismic-interpretation`:
 export NAMESPACE=seismic-interpretation
 ```
 
-Use any name you prefer. The namespace is created in [Step 1 of Application deployment](#step-1-create-the-project) but earlier steps required NAMESPACE to be defined as the paths used to reference the keys stored in trustee include the namespace as one of the path components.
+Use any name you prefer. The namespace is created in [Step 1 of Application deployment](#step-1-create-the-project) but earlier steps require the NAMESPACE to be defined, as the paths used to reference the keys stored in Trustee include the namespace as one of the path components.
 
 ### Hardware prerequisite: Enable TEE in server firmware and kernel parameters
 
@@ -484,7 +484,7 @@ Wait for the node to reboot and return to Ready:
 oc wait mcp/master --for=condition=Updated=True --timeout=30m
 ```
 
-On single-node clusters the API server itself reboots during this wait, so the command will disconnect for 2–5 minutes. Re-run it once the cluster is reachable again.
+On single-node clusters, the API server itself reboots during this wait, so the command will disconnect for 2–5 minutes. Re-run it once the cluster is reachable again.
 
 
 </details>
@@ -515,7 +515,7 @@ make check-prereqs
 
 Kata Containers is an open-source container runtime that runs each pod inside a lightweight virtual machine rather than sharing the host kernel. Unlike standard containers — which rely on Linux namespaces and cgroups for isolation — a kata container gets its own dedicated VM kernel, meaning a compromised workload cannot affect the host OS or other pods. The `kata-cc` runtime variant goes further: it runs the VM inside a hardware Trust Domain (Intel® TDX or AMD SEV-SNP), so the pod's memory is encrypted and inaccessible even to the hypervisor or cluster administrator. The `kata-cc-nvidia-gpu` runtime extends this with GPU passthrough, giving the workload direct, encrypted access to the NVIDIA GPU without exposing data outside the Trust Domain. 
 
-This quickstart uses the kata-cc-nvidia-gpu runtime class to ensure that both the cpu and gpu memory are encrypted so that it is only accessible within the pod itself.
+This quickstart uses the kata-cc-nvidia-gpu runtime class to ensure that both the CPU and GPU memory are encrypted so that they are only accessible within the pod itself.
 
 Node Feature Discovery (NFD) and OpenShift Sandboxed Containers (OSC) together enable these runtimes on the node. NFD detects the active TEE hardware and labels the node; OSC uses those labels to install the `kata-cc-nvidia-gpu` runtimeClass that pods in this quickstart use.
 
@@ -823,7 +823,7 @@ oc exec -n nvidia-gpu-operator $SANDBOX_POD -- \
 
 Confidential GPU workloads using the `kata-cc-nvidia-gpu` runtime require additional ClusterPolicy changes specific to CC (confidential computing) mode. In CC mode the NVIDIA driver runs **inside the kata guest VM** (baked into the kata guest OS image provided by OSC) — the GPU Operator must not also load it on the host. If both `driver.enabled: true` and `vfioManager.enabled: true` are set, the driver daemonset and the vfioManager may fight over the GPU. For more details see [OpenShift Sandboxed Containers 1.13, section 4.10.6](https://docs.redhat.com/en/documentation/openshift_sandboxed_containers/1.13).
 
-For confidential GPU passthrough the required ClusterPolicy values are:
+For confidential GPU passthrough, the required ClusterPolicy values are:
 
 | Setting | Required | Reason |
 |---|---|---|
@@ -1018,7 +1018,7 @@ make verify-dcap
 
 ### Trustee setup — model owner (cluster-admin, once per cluster)
 
-> **In this quickstart** the application deployer also runs Trustee setup for demo convenience. In production this section is performed by the model owner on independently controlled infrastructure. Register RVPS reference values and Register app-specific secrets with KBS are always model owner responsibilities regardless of deployment topology.
+> **In this quickstart** the application deployer also runs Trustee setup for demo convenience. In production this section is performed by the model owner on independently controlled infrastructure. Registering RVPS reference values and registering app-specific secrets with KBS are always model owner responsibilities regardless of deployment topology.
 
 #### Install Trustee
 
@@ -1264,8 +1264,8 @@ oc rollout status deployment/trustee-deployment -n trustee-operator-system --tim
 > 2. The script prints the OSC version and a Makefile variable block.
 > 3. Paste the Makefile block into the Makefile (near `KATA_RUNTIME_CLASS`), update the OSC version comment, then run `make set-rvps-values NAMESPACE=$NAMESPACE` as normal.
 
-You can check the rvps values that were registered and double check that they were registered correctly
-with trustee by running:
+You can check the RVPS values that were registered and double-check that they were registered correctly
+with Trustee by running:
 
 ```
 make show-rvps NAMESPACE=$NAMESPACE
@@ -1404,12 +1404,12 @@ of safety.
 ```
 
 The KBS will not release the model key unless one of the sets of
-registered rvps values matches the init values specified when the
+registered RVPS values matches the init values specified when the
 pod was started.
 
 The instructions are constructed so that every time you follow them you 
-are adding an additional allowed set of rvps values. To clear out
-the set of allowed rvps values you can run:
+are adding an additional allowed set of RVPS values. To clear out
+the set of allowed RVPS values you can run:
 
 ```
 make clear-rvps NAMESPACE=$NAMESPACE
@@ -1737,7 +1737,7 @@ make install NAMESPACE=$NAMESPACE
 ```
 
 This fetches the KBS TLS certificate from the cluster, builds the initdata blob (AA/CDH configuration for the kata VM), and deploys the app via Helm.
-The deployment can take 5 or more minutes and you may see logs like "Error: context deadline exeeded" as the app image is quite large and it must be pulled inside the confidential VM. Despite these logs the application will deploy after the required time to pull and start the container in the confidential virtual machine
+The deployment can take 5 or more minutes and you may see logs like "Error: context deadline exceeded" as the app image is quite large and it must be pulled inside the confidential VM. Despite these logs the application will deploy after the required time to pull and start the container in the confidential virtual machine.
 
 On startup the pod goes through the following sequence inside the kata VM:
 
@@ -1812,7 +1812,7 @@ The UI should look like this after you have requested a prediction:
 To confirm that attestation succeeded and the model key was fetched from KBS, inspect the app container logs 
 as shown below.
 
-** NOTE: ** in a real deployment you may choose to disable logs in the policy in order to avoid the possibility
+** NOTE: ** In a real deployment you may choose to disable logs in the policy in order to avoid the possibility
 of the container leaking information. We've left them enabled in the quickstart so that we can more easily show
 and explain how things are working.
 
@@ -1960,13 +1960,12 @@ This confirms that the Kata agent exec-deny policy prevents anyone — including
 
 #### Try to change the policy
 
-In the previous section you attempted to exec into the container but were denied by the policy set for the
+In the previous section, you attempted to exec into the container but were denied by the policy set for the
 confidential container.
 
-The default policy used in the quickstart is in [policies/policy-locked.rego](policies/policy-locked.rego) and the line which cause the denial in the policy was `default ExecProcessRequest := false
-` in the policy.
+The default policy used in the quickstart is in [policies/policy-locked.rego](policies/policy-locked.rego) and the line which caused the denial in the policy was `default ExecProcessRequest := false`.
 
-So let's change the policy. We can do that as the application deployer because its specified in the initdata passed when the application is started.
+So let's change the policy. We can do that as the application deployer because it's specified in the initdata passed when the application is started.
 Edit that line in policies/policy-locked.rego to change the line to `default ExecProcessRequest := true`.
 
 Stop any running instance of the quickstart with `make uninstall NAMESPACE=$NAMESPACE` and then start the application again with `make install NAMESPACE=$NAMESPACE`. 
@@ -1983,7 +1982,7 @@ You can get the trustee logs by running
 make trustee-logs
 ```
 
-and you should see an entry like the following which shows that the kbs is refusing to return the image-policy which is needed to check the signatures on the containers. This is due the attestation failure due to the mismatch between the registered initdata and what the container was started with:
+and you should see an entry like the following which shows that the kbs is refusing to return the image-policy which is needed to check the signatures on the containers. This is due to the attestation failure due to the mismatch between the registered initdata and what the container was started with:
 
 ```
 2026-08-12T21:29:28.883027Z  INFO Intel TDX: verifier::tdx: Quote DCAP check succeeded.
@@ -2000,7 +1999,7 @@ and you should see an entry like the following which shows that the kbs is refus
 2026-08-12T21:29:29.134013Z  INFO actix_web::middleware::logger: 10.128.0.183 "POST /kbs/v0/auth HTTP/1.1" 200 74 "-" "attestation-agent-kbs-client/0.1.0" 0.000447
 ```
 
-The deployment fails early as it tries to get the image policy from the KBS, but what about if we remove the image policy which requires signatures from the initdata?
+The deployment fails early as it tries to get the image policy from the KBS, but what if we remove the image policy which requires signatures from the initdata?
 
 Do that by removing the [image] and image_security_policy_uri lines in build-initdata.py
 
@@ -2021,7 +2020,7 @@ index ddb729b..6312ef4 100755
 ```
 
 Start and stop the app with `make uninstall NAMESPACE=$NAMESPACE` and then `make install NAMESPACE=$NAMESPACE` again. This time you should see that the
-deployment gets further along and the app tries to start up but the KBS does not release the key with error like this which are visible
+deployment gets further along and the app tries to start up but the KBS does not release the key with an error like this which is visible
 in the logs for the app container:
 
 ```
@@ -2060,7 +2059,7 @@ checking the trustee logs with `make trustee-logs`
 
 we can see the request for the model key being denied.
 
-Going back to look at the earlier app logs we can see that the cpu attestation failed:
+Going back to look at the earlier app logs, we can see that the CPU attestation failed:
 
 ```
     Trustworthiness vector:
@@ -2073,12 +2072,12 @@ Going back to look at the earlier app logs we can see that the cpu attestation f
 
 This is due to the rule we added to the configuration policy which requires the init-data to match the value we registered earlier. It's good to see
 that it is having the desired effect and the KBS does not release the model key if the init-data does not match what the model owner
-has registered. So while the application deployer can modify the initdata used when the application is deployed, the KBS will not release the model key unless the initdata matches the initdata specified in the rvps values registered by the model owner.
+has registered. So while the application deployer can modify the initdata used when the application is deployed, the KBS will not release the model key unless the initdata matches the initdata specified in the RVPS values registered by the model owner.
 
-Revert the changes we made to  policies/policy-locked.rego, and  scripts/build-initdata.py with:
+Revert the changes we made to `policies/policy-locked.rego` and `scripts/build-initdata.py` with:
 
 ```
-git checkout scripts/policy-locked.rego
+git checkout policies/policy-locked.rego
 git checkout scripts/build-initdata.py
 ```
 
@@ -2087,7 +2086,7 @@ before moving on to the next sections.
 #### Try to change the container arguments
 
 What if we try to run something different inside the container by changing the parameters passed
-when the container is started. These are defined in [helm/templates/deployment](helm/templates/deployment.yaml) in
+when the container is started? These are defined in [helm/templates/deployment](helm/templates/deployment.yaml) in
 the following section:
 
 ```
@@ -2110,7 +2109,7 @@ Try to change the arguments so that we would run `app/export.py` instead of `app
 ```
 
 Start and stop the app with `make uninstall NAMESPACE=$NAMESPACE` and then `make install NAMESPACE=$NAMESPACE` again. This time you should see that the
-the application fails to deploy with an error like this:
+application fails to deploy with an error like this:
 
 ![Denied with argument change](docs/images/args-modification-denied.png)
 
@@ -2192,7 +2191,7 @@ and more specifically because for the app container we've only allowed the expec
         }
 ```
 
-We know from earlier section where we tried to change the policy to allow exec that the KBS will not
+We know from the earlier section where we tried to change the policy to allow exec that the KBS will not
 release the key, so we've just confirmed the application deployer will not be able to start the container
 with arguments other than those allowed.
 
@@ -2206,9 +2205,9 @@ before proceeding to the sections which follow.
 
 #### Try to run a different container 
 
-Since we can't change the arguments to the app container lets try to run a different container
+Since we can't change the arguments to the app container, let's try to run a different container
 that would contain our own code that exports the model weights. By now we know that we'll have
-to use the same initdata that was registered so we'll use make install overriding the app image
+to use the same initdata that was registered, so we'll use make install overriding the app image
 to achieve this.
 
 Stop any earlier versions of the application with `make uninstall NAMESPACE=$NAMESPACE` and then
@@ -2279,12 +2278,12 @@ PullImageRequest if {
 #### Try to serve a different container
 
 The last section confirmed we can't just specify a different container for the application, but since 
-the application deployer controls the environment maybe they could serve a different container
+the application deployer controls the environment, maybe they could serve a different container
 when the `quay.io/rh-ai-quickstart/conf-gpu-accel-seismic-interp-deepseismic-app` container is requested.
 
-Since redirecting the pull would be a bit complicated we will simulate this by overriding the app image
+Since redirecting the pull would be a bit complicated, we will simulate this by overriding the app image
 to pull a different version of the container (we've not limited the allowed containers to a specific
-version in the quickstart) .
+version in the quickstart).
 
 Stop any earlier versions of the application with `make uninstall NAMESPACE=$NAMESPACE` and then
 start the application with:
@@ -2329,7 +2328,7 @@ The combination of confidential containers, signed images and a good policy can 
 exposed outside of the container. Achieving this requires
 
 1. that the application is designed, built and deployed carefully to avoid exposing sensitive information through the channels allowed by the policy.
-   For example if the policy allows logs to be exported that these logs do not contain any information that should not be exported.
+   For example, if the policy allows logs to be exported, ensure that these logs do not contain any information that should not be exported.
 1. a comprehensive understanding of each element in the policy (in our case [policies/policy-locked.rego](policies/policy-locked.rego)) — specifically what each rule that is not set to `false` permits, and how it might lead to disclosure in the context of the application being run. This document provides
    documentation on the different elements [IBM Confidential Computing Containers for Red Hat OpenShift Container Platform](https://www.ibm.com/docs/en/ccco/1.2.2?topic=contract-rego-policy-rules-snippets). The policy needs to be configured correctly based on the application being deployed, the
    environment, and the threats you need to protect against.
@@ -2362,7 +2361,7 @@ make generate-model-owner-keys
 
 This produces two files in `model-owner-verification-keys/`:
 - `cosign.key` — your private signing key. **Keep this secret and never commit it.** (It is gitignored automatically.)
-- `cosign.pub` — the public key. This file is committed to the repository and registered with KBS in [Trustee setup Step 7](#register-app-specific-secrets-with-kbs) so KBS knows whose signature to trust.
+- `cosign.pub` — the public key. This file is committed to the repository and registered with KBS in [Register app-specific secrets with KBS](#register-app-specific-secrets-with-kbs) so KBS knows whose signature to trust.
 
 #### Step 2: Build, push, and sign the ModelCar
 
@@ -2409,7 +2408,7 @@ oc rollout restart deployment/trustee-deployment -n trustee-operator-system
 oc rollout status deployment/trustee-deployment -n trustee-operator-system --timeout=2m
 ```
 
-Then re-run the deploy steps from [Step 4](#step-4-deploy-the-application) onwards.
+Then re-run the deploy steps from [Step 2](#step-2-deploy-the-application) onwards.
 
 ---
 
@@ -2453,7 +2452,7 @@ Pushes the image to quay.io. The target registry and repository are controlled b
 make model-owner-sign-app-container
 ```
 
-Signs the pushed application image with the model owner private key (`model-owner-verification-keys/cosign.key`). The signature is stored as an OCI referrer in the registry alongside the image. KBS uses the corresponding public key (`model-owner-verification-keys/cosign.pub`, registered in [Trustee setup Step 7](#register-app-specific-secrets-with-kbs)) to verify the signature during attestation. Signing uses `--new-bundle-format=false --use-signing-config=false --tlog-upload=false` to produce legacy-format signatures compatible with the version of image-rs bundled in OSC kata containers. cosign v3 defaults to DSSE bundle v0.3 format and OCI referrers, which image-rs does not support — the legacy format is required.
+Signs the pushed application image with the model owner private key (`model-owner-verification-keys/cosign.key`). The signature is stored as an OCI referrer in the registry alongside the image. KBS uses the corresponding public key (`model-owner-verification-keys/cosign.pub`, registered in [Trustee setup Step 7](#register-app-specific-secrets-with-kbs)) to verify the signature during attestation. Signing uses `--new-bundle-format=false --use-signing-config=false --tlog-upload=false` to produce legacy-format signatures compatible with the version of image-rs bundled in OSC kata containers. Cosign v3 defaults to DSSE bundle v0.3 format and OCI referrers, which image-rs does not support — the legacy format is required.
 
 #### After publishing
 
@@ -2476,7 +2475,7 @@ oc rollout restart deployment/trustee-deployment -n trustee-operator-system
 oc rollout status deployment/trustee-deployment -n trustee-operator-system --timeout=2m
 ```
 
-Then re-run the deploy steps from [Step 4](#step-4-deploy-the-application) onwards.
+Then re-run the deploy steps from [Step 2](#step-2-deploy-the-application) onwards.
 
 ---
 
