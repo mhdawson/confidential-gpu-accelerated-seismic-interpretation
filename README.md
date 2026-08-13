@@ -2263,7 +2263,7 @@ policy and the image we used does not match one of the specified containers, we 
 rule which is to reject the image.
 
 In addition to the signature requirement we've also limited which containers the confidential vm
-can pull in this section in  [policies/policy-locked.rego](policies/policy-locked.rego):
+can pull in this section in [policies/policy-locked.rego](policies/policy-locked.rego):
 
 ```
 # Only allow pulling images whose registry path matches an image_guest_pull source
@@ -2297,8 +2297,8 @@ You should see that the app containers is not pulled, with an error that says `I
 
 ![Unsigned image fails](docs/images/sigstore-signed-denied.png)
 
-This failure is because we've configured the image policy in trustee such that the image must be signed by a key the model owner registered
-trustee. From the image policy:
+This failure is because we've configured the image policy in trustee such that the image must be signed by a key the model
+owner registered in trustee. From the image policy:
 
 ```
    "transports": {
@@ -2324,6 +2324,20 @@ which is only held by the model owner. So even if the application deployer can m
 a different container than that published by the model owner, the container will not start because it is not signed by the right key. 
 
 #### Closing thoughts on verifying confidential execution
+
+The combination of confidential containers, signed images and a good policy can protect the model weights from being
+exposed outside of the container. Achieving this requires
+
+1. that the application is designed, built and deployed carefully to avoid exposing sensitive information through the channels allowed by the policy.
+   For example if the policy allows logs to be exported that these logs do not contain any information that should not be exported
+1. a comprehensive understanding of each element in the policy (in our case [policies/policy-locked.rego](policies/policy-locked.rego)) — specifically what each rule that is not set to `false` permits, and how it might lead to disclosure in the context of the application being run. This document provides
+   documentation on the different elements [IBM Confidential Computing Containers for Red Hat OpenShift Container Platform](https://www.ibm.com/docs/en/ccco/1.2.2?topic=contract-rego-policy-rules-snippets). The policy needs to be configured correctly based on the application being deployed, the
+   environment, the threats you need to protect against.
+1. careful management of the initdata which is registered with trustee to ensure that keys are only released to the approved containers running 
+   constrained by the appropriate policy.
+
+In the previous sections we've gone through some of the scenarios you should check for a production application there are others which you
+should create/test based on your specific application, desired policy constraints and threat environment.
 
 ### Optional: Encrypt and publish your own model — model owner
 
