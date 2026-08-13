@@ -19,7 +19,7 @@ AI-powered classification from North Sea seismic data — run this quickstart wi
   - [Roles](#roles)
   - [Clone the repository](#clone-the-repository)
   - [Set your deployment namespace](#set-your-deployment-namespace)
-  - [Hardware prerequisite: Enable TEE in server firmware and kernel parameters](#hardware-prerequisite-enable-tee-in-server-firmware-and-kernel-parameters)
+  - [Enable TEE in server firmware and kernel parameters](#hardware-prerequisite-enable-tee-in-server-firmware-and-kernel-parameters)
   - [Kata containers setup — application deployer (cluster-admin, once per cluster)](#kata-containers-setup--application-deployer-cluster-admin-once-per-cluster)
   - [Intel TDX Quote Generation Service setup — application deployer (cluster-admin, once per cluster, Intel TDX only)](#intel-tdx-quote-generation-service-setup--application-deployer-cluster-admin-once-per-cluster-intel-tdx-only)
   - [Trustee setup — model owner (cluster-admin, once per cluster)](#trustee-setup--model-owner-cluster-admin-once-per-cluster)
@@ -263,8 +263,6 @@ Attestation requires outbound HTTPS (port 443) access from the clusters to the f
 | Trustee cluster | `rim.attestation.nvidia.com` | NVIDIA RIM Service — fetches GPU firmware reference integrity manifests |
 | Trustee cluster | `ocsp.ndis.nvidia.com` | NVIDIA OCSP — GPU certificate revocation checks |
 
-> In a restricted network environment, `api.trustedservices.intel.com` can be replaced by a locally deployed PCCS instance (see the note in the hardware prerequisite section). AMD does not provide an equivalent local caching service for KDS, but VCEK certificates can be pre-fetched and cached. Local mirroring of the NVIDIA RIM and OCSP services may also be possible — refer to the [NVIDIA Attestation documentation](https://docs.nvidia.com/attestation/index.html) for details.
-
 ### Required user permissions
 
 **Cluster-admin tasks (done once per cluster):**
@@ -304,7 +302,7 @@ This quickstart involves two distinct parties. Each section is labeled with whic
 
 **Application deployer** — operates the OpenShift cluster where the application runs. Installs kata confidential containers infrastructure, deploys the application, and uses it.
 
-> **Quickstart simplification:** In this quickstart both roles are performed by one person and Trustee runs on the same cluster as the application for demo convenience. In production, Trustee would run on infrastructure controlled by the model owner, separate from the application cluster.
+> **Quickstart simplification:** In this quickstart both roles are performed by the person running the quickstart and Trustee runs on the same cluster as the application for demo convenience. In production, Trustee would run on infrastructure controlled by the model owner, separate from the application cluster. Keep this in mind as you switch between the two roles.
 
 ### Clone the repository
 
@@ -323,9 +321,9 @@ The default namespace used in this quickstart is `seismic-interpretation`:
 export NAMESPACE=seismic-interpretation
 ```
 
-Use any name you prefer. The namespace is created in [Step 1 of Application deployment](#step-1-create-the-project) but earlier steps require the NAMESPACE to be defined, as the paths used to reference the keys stored in Trustee include the namespace as one of the path components.
+The namespace is created in [Step 1 of Application deployment](#step-1-create-the-project) but earlier steps require the NAMESPACE to be defined, as the paths used to reference the keys stored in Trustee include the namespace as one of the path components.
 
-### Hardware prerequisite: Enable TEE in server firmware and kernel parameters
+### Enable TEE in server firmware and kernel parameters
 
 Confidential containers require a hardware Trusted Execution Environment (TEE). This is a one-time server configuration done via your BMC/IPMI console. The BIOS settings and kernel parameters must be applied before the kata containers setup below.
 
@@ -345,7 +343,7 @@ Access the BIOS setup utility via your BMC/IPMI console. Navigate to **Socket Co
 | SW Guard Extensions (SGX) | Enabled | Required for TDX attestation infrastructure |
 | SGX Factory Reset | Enabled | Required for remote attestation |
 
-Save and reboot the server. Full Intel hardware setup guide: https://cc-enabling.trustedservices.intel.com/intel-tdx-enabling-guide/04/hardware_setup/
+Save and reboot the server. The RfFull Intel hardware setup guide is available at: https://cc-enabling.trustedservices.intel.com/intel-tdx-enabling-guide/04/hardware_setup/
 
 After the server comes back, verify TDX is active:
 
@@ -363,6 +361,8 @@ oc debug node/$NODE -- chroot /host dmesg | grep -i tdx
 Expected output includes `virt/tdx: BIOS enabled` and `virt/tdx: module initialized`. If you see no tdx lines, the BIOS settings were not saved correctly.
 
 **AMD SEV-SNP (AMD EPYC)**
+
+**NOTE:** Support for AMD SEV-SNP is still a work in progress and has not be validated.
 
 Access the BIOS setup utility and enable SEV-SNP under the memory/security settings (path varies by server vendor — consult your server's BIOS reference manual). Verify with:
 
@@ -473,6 +473,49 @@ To validate all hardware and software prerequisites before proceeding:
 
 ```bash
 make check-prereqs
+```
+
+Verify that output indicates that everything is installed as expected:
+```
+=== Local tools ===
+  [PASS] oc found: /usr/local/bin/oc
+  [PASS] helm found: /usr/local/bin/helm
+  [PASS] cosign found: /home/nvidia/confidential-gpu-accelerated-seismic-interpretation/bin/cosign
+  [PASS] openssl found: /usr/bin/openssl
+  [PASS] curl found: /usr/bin/curl
+  [PASS] base64 found: /usr/bin/base64
+  [PASS] python3 found: /usr/bin/python3
+
+=== OpenShift cluster ===
+  [PASS] Logged in as: system:admin
+  [PASS] OpenShift version 4.21.24 == 4.21.24
+  [PASS] cluster-admin: can create MachineConfig
+  [PASS] Node architecture: x86_64 (amd64)
+
+=== CPU TEE capability ===
+  Checking dmesg on rh34-jharmiso-mig-0630-gpu01 (spawns a debug pod ? takes ~30s)...
+  [PASS] Intel TDX: BIOS enabled ? BIOS enabled: private KeyID range [16, 64)
+  [PASS] Intel TDX: kernel initialized ? TDX active
+  [PASS] Intel TDX: NFD label intel.feature.node.kubernetes.io/tdx confirmed
+
+=== Required operators ===
+  [PASS] cert-manager operator: installed
+  [PASS] NVIDIA GPU Operator: installed
+  [PASS] Node Feature Discovery: installed
+  [PASS] OpenShift Sandboxed Containers: installed
+  [PASS] Trustee operator: installed
+
+=== TEE kernel parameters (MachineConfigs) ===
+  [PASS] MachineConfig 99-enable-intel-tdx present (kvm_intel.tdx=1 + vsock-loopback)
+  [PASS] MachineConfig 100-iommu-kernel-args present
+
+=== Intel DCAP (TDX quote generation) ===
+  [PASS] Intel Device Plugin Operator: installed
+  [PASS] Intel TDX DCAP Operator: installed
+  [PASS] TdxQuoteGenerationService: 1 QGS pod(s) running
+
+=== Summary ===
+  PASS: 24   FAIL: 0   WARN: 0
 ```
 
 > **Intel TDX: Provisioning Certificate Caching Service (PCCS)**
