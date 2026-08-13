@@ -48,6 +48,7 @@ AI-powered classification from North Sea seismic data — running within a confi
   - [Optional: Build and publish your own application — model owner](#optional-build-and-publish-your-own-application--model-owner)
   - [What you've accomplished](#what-youve-accomplished)
   - [Delete](#delete)
+- [Reference](#references)
 - [Tags](#tags)
 
 ---
@@ -2546,18 +2547,23 @@ oc delete namespace trustee-operator-system
 
 ---
 
+## Reference
+
+### Product documentation
+
+- [Red Hat OpenShift AI](https://docs.redhat.com/en/documentation/red_hat_openshift_ai_self-managed)
+- [OpenShift Sandboxed Containers](https://docs.redhat.com/en/documentation/openshift_sandboxed_containers/1.13)
+- [Trustee (Confidential Containers Key Broker Service)](https://github.com/confidential-containers/trustee)
+
+---
+
 ## Tags
 
 * **Title:** Confidential GPU-Accelerated Seismic Interpretation
-* **Product:** Red Hat OpenShift, OpenShift Sandboxed Containers
-* **Category:** Geoscience / Petroleum Engineering / Confidential Computing
+* **Description:** AI-powered classification from North Sea seismic data — running within a confidential container on OpenShift AI.
+* **Industry:** Utilities
+* **Product:** Red Hat OpenShift AI, OpenShift Sandboxed Containers, Red Hat build of Trustee
 * **Use case:** Predictive modelling, seismic facies classification, confidential AI inference, encrypted model distribution
-* **Model:** U-Net ResNet-50 (segmentation-models-pytorch) — MIT license — published as AES-256-CBC encrypted ModelCar OCI image
-* **Dataset:** Dutch F3 Benchmark Dataset — MIT license
-* **GPU:** NVIDIA GPU with Confidential Computing mode (H100, H200, B100 and later) with PCI passthrough into hardware Trust Domain
-* **Attestation:** Three-factor — CPU TEE (Intel® TDX or AMD SEV-SNP) + NVIDIA NRAS (GPU) + Cosign image signature
-* **Industry:** Energy / Oil & Gas
-* **Difficulty:** Intermediate
-* **Time to complete:** ~10 minutes to first result; classification of a single seismic section completes in seconds
+* **Contributor org:** Red Hat
 
 **Thank you for using the Seismic Interpretation Quickstart!**
