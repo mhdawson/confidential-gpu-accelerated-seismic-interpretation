@@ -551,11 +551,20 @@ For more on Kata Containers, see the [Kata Containers documentation](https://kat
 
 To automatically install Kata containers and GPU passthrough (after the hardware prerequisite above is complete):
 
+> **WARNING:** `make setup-kata` triggers two separate node reboot rollouts — first from the KataConfig (10–20 minutes), then from the KubeletConfig (another 10–20 minutes). Allow 30–40 minutes total; on single-node clusters the API server will be briefly unreachable during each reboot.
+
 ```bash
 make setup-kata
 ```
 
-After `setup-kata` completes, label the GPU node(s) you want to dedicate to kata VM passthrough. Nodes labeled `vm-passthrough` stop advertising `nvidia.com/gpu` and instead advertise `nvidia.com/pgpu` — unlabeled GPU nodes continue serving standard CUDA workloads unchanged:
+After `setup-kata` completes, list your GPU nodes to identify which to dedicate to kata VM passthrough:
+
+```bash
+oc get nodes -l nvidia.com/gpu.present=true \
+    -o custom-columns=NAME:.metadata.name,WORKLOAD:.metadata.labels."nvidia\.com/gpu\.workload\.config"
+```
+
+> **Recommendation:** In multi-GPU-node clusters, label only the node(s) dedicated to confidential kata workloads. Nodes labeled `vm-passthrough` stop advertising `nvidia.com/gpu` and instead advertise `nvidia.com/pgpu` — any standard CUDA workload with a hard node selector pointing to a labeled node will fail to get a GPU and must be moved to an unlabeled node first. Unlabeled GPU nodes continue serving standard CUDA workloads unchanged.
 
 ```bash
 make setup-gpu-passthrough GPU_PASSTHROUGH_NODES="<node1> <node2>"
@@ -954,6 +963,8 @@ To confirm that GPU passthrough is correctly configured — ClusterPolicy settin
 ```bash
 make verify-gpu-passthrough
 ```
+
+Review the output and make sure that all sections show `PASS` before proceeding to the next section.
 
 ---
 
