@@ -1,6 +1,6 @@
 # Confidential GPU-Accelerated Seismic Interpretation
 
-AI-powered classification from North Sea seismic data — running with in a confidential container on OpenShift AI.
+AI-powered classification from North Sea seismic data — running within a confidential container on OpenShift AI.
 
 ## Table of contents
 
@@ -158,7 +158,7 @@ A containerised web application running on OpenShift that:
 5. Runs U-Net ResNet-50 inference on a GPU, classifying every pixel as one of six North Sea rock types
 6. Displays a colour-coded facies classification alongside the seismic input in the browser
 
-The following an example of the what the app looks like:
+The following is an example of what the app looks like:
 
 ![App UI](docs/images/app-ui.png)
 
@@ -248,18 +248,18 @@ flowchart LR
 
 ### Minimum hardware requirements
 
-It is recommended that this quickstart only be deployed in cluster not being used concurrently for other deployments. Installation requires multiple node reboots and applies configuration that may be incompatible with deployemnts not using confidential containers.
+It is recommended that this quickstart only be deployed in cluster not being used concurrently for other deployments. Installation requires multiple node reboots and applies configuration that may be incompatible with deployments not using confidential containers.
 
 | Component | Minimum | Notes |
 |---|---|---|
 | GPU | NVIDIA GPU with Confidential Computing mode support (e.g. H100, H200, B100) | Hopper architecture and later support NVIDIA CC mode and NRAS attestation. Consumer GPUs (RTX 3090, RTX 4090) and older data center GPUs (A100) do not support CC mode and cannot pass the NVIDIA attestation check. |
 | CPU | Intel® Xeon 5th Gen+ (Emerald Rapids) with TDX, or AMD EPYC 9004 series (Genoa) with SEV-SNP | TEE must be enabled in the BIOS. Earlier CPU generations may not support TDX or SEV-SNP. |
 | RAM | 128GB | The kata VM takes 24GB, OCP control plane requires ~32GB, and GPU/OSC/Trustee system pods consume additional memory. 64GB is insufficient in practice. |
-| Storage | 50GB | For ModelCar image cache |o
+| Storage | 50GB | For ModelCar image cache |
 
 **NOTE:** A CPU TEE (Intel® TDX or AMD SEV-SNP) and NVIDIA CC mode are **both** hard requirements — the Key Broker Server will not release the model decryption key unless all three attestation checks pass.
 
-**NOTE:** At this point in time the quickstart has only been validate to work with Intel TDX, validate with AMD SEV-SNP is a work in progress
+**NOTE:** At this point in time the quickstart has only been validated to work with Intel TDX; validation with AMD SEV-SNP is a work in progress
 
 ### Minimum software requirements
 
@@ -343,7 +343,7 @@ The default namespace used in this quickstart is `seismic-interpretation`:
 export NAMESPACE=seismic-interpretation
 ```
 
-Use any name you prefer. The namespace is created in [Step 1 of Application deployment](#step-1-create-the-project) but earlier steps required NAMESPACE to be defined as the paths used to reference the keys stored in trustee include the namespace as one of the path components.t
+Use any name you prefer. The namespace is created in [Step 1 of Application deployment](#step-1-create-the-project) but earlier steps required NAMESPACE to be defined as the paths used to reference the keys stored in trustee include the namespace as one of the path components.
 
 ### Hardware prerequisite: Enable TEE in server firmware and kernel parameters
 
@@ -515,7 +515,7 @@ make check-prereqs
 
 Kata Containers is an open-source container runtime that runs each pod inside a lightweight virtual machine rather than sharing the host kernel. Unlike standard containers — which rely on Linux namespaces and cgroups for isolation — a kata container gets its own dedicated VM kernel, meaning a compromised workload cannot affect the host OS or other pods. The `kata-cc` runtime variant goes further: it runs the VM inside a hardware Trust Domain (Intel® TDX or AMD SEV-SNP), so the pod's memory is encrypted and inaccessible even to the hypervisor or cluster administrator. The `kata-cc-nvidia-gpu` runtime extends this with GPU passthrough, giving the workload direct, encrypted access to the NVIDIA GPU without exposing data outside the Trust Domain. 
 
-This quickstart usees the kata-cc-nvidia-gpu runtime class to ensure that both the cpu and gpu memory are encrypted so that it is only accessible within the pod itself.
+This quickstart uses the kata-cc-nvidia-gpu runtime class to ensure that both the cpu and gpu memory are encrypted so that it is only accessible within the pod itself.
 
 Node Feature Discovery (NFD) and OpenShift Sandboxed Containers (OSC) together enable these runtimes on the node. NFD detects the active TEE hardware and labels the node; OSC uses those labels to install the `kata-cc-nvidia-gpu` runtimeClass that pods in this quickstart use.
 
@@ -821,7 +821,7 @@ oc exec -n nvidia-gpu-operator $SANDBOX_POD -- \
 
 #### Step 3: Configure GPU Operator for confidential containers
 
-Confidential GPU workloads using the `kata-cc-nvidia-gpu` runtime require additional ClusterPolicy changes specific to CC (confidential computing) mode. In CC mode the NVIDIA driver runs **inside the kata guest VM** (baked into the kata guest OS image provided by OSC) — the GPU Operator must not also load it on the host. If both `driver.enabled: true` and `vfioManager.enabled: true` are set, the driver daemonset and the vfioManager may fight over the GPU. for more details see [OpenShift Sandboxed Containers 1.13, section 4.10.6](https://docs.redhat.com/en/documentation/openshift_sandboxed_containers/1.13).
+Confidential GPU workloads using the `kata-cc-nvidia-gpu` runtime require additional ClusterPolicy changes specific to CC (confidential computing) mode. In CC mode the NVIDIA driver runs **inside the kata guest VM** (baked into the kata guest OS image provided by OSC) — the GPU Operator must not also load it on the host. If both `driver.enabled: true` and `vfioManager.enabled: true` are set, the driver daemonset and the vfioManager may fight over the GPU. For more details see [OpenShift Sandboxed Containers 1.13, section 4.10.6](https://docs.redhat.com/en/documentation/openshift_sandboxed_containers/1.13).
 
 For confidential GPU passthrough the required ClusterPolicy values are:
 
@@ -1272,9 +1272,9 @@ make show-rvps NAMESPACE=$NAMESPACE
 ```
 
 This shows you what would be registered if you ran make `set-rvps-values` as well as a check against what
-has already been registred.
+has already been registered.
 
-You should seen an output like the following where in the second section
+You should see an output like the following where in the second section
 it indicates that all values match a registered value except for
 `mr_seam` that we have not registered for the quickstart because it
 would require that your firmware version match the exact value specified.
@@ -1404,10 +1404,10 @@ of safety.
 ```
 
 The KBS will not release the model key unless one of the sets of
-registered rvps values matches the init values specificed when the
+registered rvps values matches the init values specified when the
 pod was started.
 
-The intructions are constructed so that every time you follow them you 
+The instructions are constructed so that every time you follow them you 
 are adding an additional allowed set of rvps values. To clear out
 the set of allowed rvps values you can run:
 
@@ -1737,7 +1737,7 @@ make install NAMESPACE=$NAMESPACE
 ```
 
 This fetches the KBS TLS certificate from the cluster, builds the initdata blob (AA/CDH configuration for the kata VM), and deploys the app via Helm.
-The deployment can make 5 or more minutes and you may see logs like "Error: context deadline exeeded" as the app image is quite large and it must be pulled inside the confidential VM. Despite these logs the application will deploy after the required time to pull and start the container in the confidentialvirtual machine
+The deployment can take 5 or more minutes and you may see logs like "Error: context deadline exeeded" as the app image is quite large and it must be pulled inside the confidential VM. Despite these logs the application will deploy after the required time to pull and start the container in the confidential virtual machine
 
 On startup the pod goes through the following sequence inside the kata VM:
 
@@ -1803,7 +1803,7 @@ The output image shows two panels side by side:
 
 Click **Clear** to reset and upload a different section.
 
-The UI should look like this after you have requested a prection:
+The UI should look like this after you have requested a prediction:
 
 ![App UI](docs/images/app-ui.png)
 
@@ -1812,7 +1812,7 @@ The UI should look like this after you have requested a prection:
 To confirm that attestation succeeded and the model key was fetched from KBS, inspect the app container logs 
 as shown below.
 
-** NOTE: ** in a real deployment you may chose to disable logs in the policy in order to avoid the posibility
+** NOTE: ** in a real deployment you may choose to disable logs in the policy in order to avoid the possibility
 of the container leaking information. We've left them enabled in the quickstart so that we can more easily show
 and explain how things are working.
 
@@ -1983,7 +1983,7 @@ You can get the trustee logs by running
 make trustee-logs
 ```
 
-and you should see an entry like the following which shows that the kbs is refusing to return the image-policy which is needed to check the signatres on the containers. This is due the attestation failure due to the mismatch between the registered initdata and what the container was started with:
+and you should see an entry like the following which shows that the kbs is refusing to return the image-policy which is needed to check the signatures on the containers. This is due the attestation failure due to the mismatch between the registered initdata and what the container was started with:
 
 ```
 2026-08-12T21:29:28.883027Z  INFO Intel TDX: verifier::tdx: Quote DCAP check succeeded.
@@ -2060,7 +2060,7 @@ checking the trustee logs with `make trustee-logs`
 
 we can see the request for the model key being denied.
 
-Going back to look earlier the app logs we can see that the cpu attestation failed:
+Going back to look at the earlier app logs we can see that the cpu attestation failed:
 
 ```
     Trustworthiness vector:
@@ -2071,7 +2071,7 @@ Going back to look earlier the app logs we can see that the cpu attestation fail
         init_data                      36e67cfd30adc2aa1f4c5fad46e28595ffec0ff6232af2b62a132b2dff2bd69b00000000000000000000000000000000
 ```
 
-This is due to the rule we added to the configuration policy which requies the init-data to match the value we registered earlier. Its good to see
+This is due to the rule we added to the configuration policy which requires the init-data to match the value we registered earlier. It's good to see
 that it is having the desired effect and the KBS does not release the model key if the init-data does not match what the model owner
 has registered. So while the application deployer can modify the initdata used when the application is deployed, the KBS will not release the model key unless the initdata matches the initdata specified in the rvps values registered by the model owner.
 
@@ -2175,7 +2175,7 @@ policy_data := {
 }
 ```
 
-and more specifically because for the app container we've only allwed the expected Process Arguments:
+and more specifically because for the app container we've only allowed the expected Process Arguments:
 
 ```
         {
@@ -2207,7 +2207,7 @@ before proceeding to the sections which follow.
 #### Try to run a different container 
 
 Since we can't change the arguments to the app container lets try to run a different container
-that would contain our own code that exports the model weights. By know we know that we'll have
+that would contain our own code that exports the model weights. By now we know that we'll have
 to use the same initdata that was registered so we'll use make install overriding the app image
 to achieve this.
 
@@ -2293,7 +2293,7 @@ start the application with:
 make install APP_IMG=quay.io/rh-ai-quickstart/conf-gpu-accel-seismic-interp-deepseismic-app:unsigned-image NAMESPACE=$NAMESPACE
 ```
 
-You should see that the app containers is not pulled, with an error that says `Image policy rejected: Denied by policy: rejected by sigstoreSigned rule` like this:
+You should see that the app container is not pulled, with an error that says `Image policy rejected: Denied by policy: rejected by sigstoreSigned rule` like this:
 
 ![Unsigned image fails](docs/images/sigstore-signed-denied.png)
 
