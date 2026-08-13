@@ -1966,7 +1966,7 @@ The default policy used in the quickstart is in [policies/policy-locked.rego](po
 So let's change the policy. We can do that as the application deployer because its specified in the initdata passed when the application is started.
 Edit that line in policies/policy-locked.rego to change the line to `default ExecProcessRequest := true`.
 
-Stop any running instance of the quickstart with `make uninstall` and then start the application again with `make install`. 
+Stop any running instance of the quickstart with `make uninstall NAMESPACE=$NAMESPACE` and then start the application again with `make install NAMESPACE=$NAMESPACE`. 
 
 You will notice that the app fails to deploy. Look at the events for the pod in the UI and you should see something like this:
 
@@ -2017,7 +2017,7 @@ index ddb729b..6312ef4 100755
  toml = f"""\
 ```
 
-Start and stop the app with `make uninstall` and then `make install` again. This time you should see that the
+Start and stop the app with `make uninstall NAMESPACE=$NAMESPACE` and then `make install NAMESPACE=$NAMESPACE` again. This time you should see that the
 deployment gets further along and the app tries to start up but the KBS does not release the key with error like this which are visible
 in the logs for the app container:
 
@@ -2083,7 +2083,7 @@ before moving on to the next sections.
 
 #### Try to change the container arguments
 
-What is we try to run something different inside the container by changing the parameters passed
+What if we try to run something different inside the container by changing the parameters passed
 when the container is started. These are defined in [helm/templates/deployment](helm/templates/deployment.yaml) in
 the following section:
 
@@ -2106,7 +2106,7 @@ Try to change the arguments so that we would run `app/export.py` instead of `app
 
 ```
 
-Start and stop the app with `make uninstall` and then `make install` again. This time you should see that the
+Start and stop the app with `make uninstall NAMESPACE=$NAMESPACE` and then `make install NAMESPACE=$NAMESPACE` again. This time you should see that the
 the application fails to deploy with an error like this:
 
 ![Denied with argument change](docs/images/args-modification-denied.png)
@@ -2189,6 +2189,10 @@ and more specifically because for the app container we've only allwed the expect
         }
 ```
 
+We know from earlier section where we tried to change the policy to allow exec that the KBS will not
+release the key, so we've just confirmed the application deployer will not be able to start the container
+with arguments other than those allowed.
+
 Revert the deployment file back to its original version with
 
 ```
@@ -2196,6 +2200,71 @@ git checkout helm/templates/deployment.yaml
 ```
 
 before proceeding to the sections which follow.
+
+#### Try to run a different container 
+
+Since we can't change the arguments to the app container lets try to run a different container
+that would container our own code. By know we know that we'll have to use the same initdata
+that was registered so we'll use make install overriding the app image.
+
+Stop any earlier versions of the application with `make uninstall NAMESPACE=$NAMESPACE` and then
+start the application with
+
+```
+make install APP_IMG=quay.io/ubi9/ubi9-minimal:latest  NAMESPACE=$NAMESPACE
+```
+
+You'll see that the app image is not pulled and there will be an error like:
+
+
+![Fails with different container](docs/images/fails-with-different-container.png)
+
+The failure is because the policy includes an image policy which we set as part
+of the trustee configuration, you can get this policy by running
+
+```
+oc get secret $NAMESPACE -n trustee-operator-system -o jsonpath='{.data.image-policy}' | base64 -d | python3 -m json.tool
+```
+
+and it should look something like:
+
+```
+{
+    "default": [
+        {
+            "type": "reject"
+        }
+    ],
+    "transports": {
+        "docker": {
+            "quay.io/rh-ai-quickstart/conf-gpu-accel-seismic-interp-deepseismic-app": [
+                {
+                    "type": "sigstoreSigned",
+                    "keyPath": "kbs:///default/seismic-interpretation/cosign-key"
+                }
+            ],
+            "quay.io/rh-ai-quickstart/conf-gpu-accel-seismic-interp-deepseismic-model": [
+                {
+                    "type": "sigstoreSigned",
+                    "keyPath": "kbs:///default/seismic-interpretation/cosign-key"
+                }
+            ]
+        }
+    }
+}
+```
+
+Since the initdata (which we can't change or the KBS won't release the key later on) specifies that
+policy and the image we used does not match one of the specified containers, we match the default
+rule which is to reject the image.
+
+```
+git checkout helm/templates/deployment.yaml
+```
+
+before proceeding to the sections which follow.
+
+#### Try to run a different container 
 
 
 ### Optional: Encrypt and publish your own model — model owner
