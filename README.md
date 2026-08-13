@@ -1,6 +1,6 @@
 # Confidential GPU-Accelerated Seismic Interpretation
 
-AI-powered classification from North Sea seismic data — running with a three-factor attested, encrypted model in a confidential container on OpenShift AI.
+AI-powered classification from North Sea seismic data — running with in a confidential container on OpenShift AI.
 
 ## Table of contents
 
@@ -2329,14 +2329,14 @@ The combination of confidential containers, signed images and a good policy can 
 exposed outside of the container. Achieving this requires
 
 1. that the application is designed, built and deployed carefully to avoid exposing sensitive information through the channels allowed by the policy.
-   For example if the policy allows logs to be exported that these logs do not contain any information that should not be exported
+   For example if the policy allows logs to be exported that these logs do not contain any information that should not be exported.
 1. a comprehensive understanding of each element in the policy (in our case [policies/policy-locked.rego](policies/policy-locked.rego)) — specifically what each rule that is not set to `false` permits, and how it might lead to disclosure in the context of the application being run. This document provides
    documentation on the different elements [IBM Confidential Computing Containers for Red Hat OpenShift Container Platform](https://www.ibm.com/docs/en/ccco/1.2.2?topic=contract-rego-policy-rules-snippets). The policy needs to be configured correctly based on the application being deployed, the
-   environment, the threats you need to protect against.
+   environment, and the threats you need to protect against.
 1. careful management of the initdata which is registered with trustee to ensure that keys are only released to the approved containers running 
    constrained by the appropriate policy.
 
-In the previous sections we've gone through some of the scenarios you should check for a production application there are others which you
+In the previous sections we've gone through some of the scenarios you should check. For a production application there are others which you
 should create/test based on your specific application, desired policy constraints and threat environment.
 
 ### Optional: Encrypt and publish your own model — model owner
