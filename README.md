@@ -40,6 +40,7 @@ AI-powered classification from North Sea seismic data — running with a three-f
   - [Verify confidential execution](#verify-confidential-execution)
     - [Attempt to access the running container](#attempt-to-access-the-running-container)
     - [Try to change the policy](#try-to-change-the-policy)
+    - [Try to change the container arguments](#try-to-change-the-container-arguments)
   - [Optional: Encrypt and publish your own model — model owner](#optional-encrypt-and-publish-your-own-model--model-owner)
   - [Optional: Build and publish your own application — model owner](#optional-build-and-publish-your-own-application--model-owner)
   - [What you've accomplished](#what-youve-accomplished)
@@ -2079,6 +2080,123 @@ git checkout scripts/build-initdata.py
 ```
 
 before moving on to the next sections.
+
+#### Try to change the container arguments
+
+What is we try to run something different inside the container by changing the parameters passed
+when the container is started. These are defined in [helm/templates/deployment](helm/templates/deployment.yaml) in
+the following section:
+
+```
+     containers:
+        - name: app
+          image: {{ .Values.app.image }}
+          imagePullPolicy: Always
+          command: ["/bin/bash", "-c", "bash /app/decrypt.sh && python /app/app.py"]
+```
+
+Try to change the arguments so that we would run `app/export.py` instead of `app/app.py` 
+
+```
+    containers:
+        - name: app
+          image: {{ .Values.app.image }}
+          imagePullPolicy: Always
+          command: ["/bin/bash", "-c", "bash /app/decrypt.sh && python /app/export.py"]
+
+```
+
+Start and stop the app with `make uninstall` and then `make install` again. This time you should see that the
+the application fails to deploy with an error like this:
+
+![Denied with argument change](docs/images/args-modification-denied.png)
+
+This is because in  [policies/policy-locked.rego](policies/policy-locked.rego) we only whitelist the
+allowed parameters/command line that can be used in this section:
+
+```
+CreateContainerRequest if {
+    some container in policy_data.containers
+    input.OCI.Process.Args == container.OCI.Process.Args
+    count(input.storages) > 0
+    every storage in input.storages {
+        storage_allowed(storage, container)
+    }
+}
+
+# A storage is allowed only if it matches a declared entry in the container's policy_data
+# storages list by both driver and source prefix — rejects unexpected drivers or registries.
+storage_allowed(storage, container) if {
+    some allowed_storage in container.storages
+    storage.driver == allowed_storage.driver
+    startswith(storage.source, allowed_storage.source)
+}
+
+policy_data := {
+    "containers": [
+        {
+            "OCI": {
+                "Process": {
+                    "Args": ["/usr/bin/pod"]
+                }
+            },
+            "storages": [
+                {"driver": "image_guest_pull", "source": "pause"}
+            ]
+        },
+        {
+            "OCI": {
+                "Process": {
+                    "Args": ["/bin/cp", "-r", "/model/.", "/models-cache/"]
+                }
+            },
+            "storages": [
+                {"driver": "image_guest_pull", "source": "{model_image_repo}:"},
+                {"driver": "image_guest_pull", "source": "{model_image_repo}@"},
+                {"driver": "ephemeral", "source": "tmpfs"}
+            ]
+        },
+        {
+            "OCI": {
+                "Process": {
+                    "Args": ["/bin/bash", "-c", "bash /app/decrypt.sh && python /app/app.py"]
+                }
+            },
+            "storages": [
+                {"driver": "image_guest_pull", "source": "{app_image_repo}:"},
+                {"driver": "image_guest_pull", "source": "{app_image_repo}@"},
+                {"driver": "ephemeral", "source": "tmpfs"}
+            ]
+        }
+    ]
+}
+```
+
+and more specifically because for the app container we've only allwed the expected Process Arguments:
+
+```
+        {
+            "OCI": {
+                "Process": {
+                    "Args": ["/bin/bash", "-c", "bash /app/decrypt.sh && python /app/app.py"]
+                }
+            },
+            "storages": [
+                {"driver": "image_guest_pull", "source": "{app_image_repo}:"},
+                {"driver": "image_guest_pull", "source": "{app_image_repo}@"},
+                {"driver": "ephemeral", "source": "tmpfs"}
+            ]
+        }
+```
+
+Revert the deployment file back to its original version with
+
+```
+git checkout helm/templates/deployment.yaml
+```
+
+before proceeding to the sections which follow.
+
 
 ### Optional: Encrypt and publish your own model — model owner
 
