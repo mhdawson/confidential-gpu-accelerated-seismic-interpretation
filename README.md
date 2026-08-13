@@ -2510,18 +2510,39 @@ oc delete project seismic-interpretation
 
 #### Cluster-wide resources (cluster-admin)
 
-The KataConfig, NFD, OSC, and Trustee operator are cluster-wide resources shared with other workloads. Only remove them if no other confidential workloads are running on the cluster:
+The KataConfig, NFD, OSC, Trustee operator, Intel DCAP stack, MachineConfigs, and GPU operator CC mode are cluster-wide resources shared with other workloads. Only remove them if no other confidential workloads are running on the cluster:
+
+> **Warning:** Removing these resources will trigger multiple node reboots as MachineConfigs are unapplied and the IOMMU and TDX kernel parameters are removed. Do not proceed if the cluster is in active use for any other workloads.
 
 ```bash
 # Only run if no other confidential workloads exist on the cluster
+
+# Revert GPU operator to standard mode
+oc patch clusterpolicy gpu-cluster-policy --type merge \
+    -p '{"spec":{"ccManager":{"enabled":false},"driver":{"enabled":true},"toolkit":{"enabled":true},"devicePlugin":{"enabled":true},"vfioManager":{"enabled":false}}}'
+
+# Intel TDX DCAP (quote generation service and device plugin)
+oc delete tdxquotegenerationservice intel-tdx-dcap -n intel-dcap
+oc delete sgxdeviceplugin sgxdeviceplugin-sample -n intel-dcap
+oc delete namespace intel-dcap
+
+# Kata / OSC
 oc delete kataconfig example-kataconfig
-oc delete trusteeconfig trusteeconfig -n trustee-operator-system
-oc delete namespace trustee-operator-system
+oc delete machineconfig 99-enable-intel-tdx
+oc delete machineconfig 100-iommu-kernel-args
+oc delete kubeletconfig kata-runtime-request-timeout
+oc delete nodefeaturerule tdx-features
 oc delete subscription sandboxed-containers-operator -n openshift-sandboxed-containers-operator
 oc delete namespace openshift-sandboxed-containers-operator
 oc delete crd kataconfigs.kataconfiguration.openshift.io
+
+# NFD
 oc delete subscription nfd -n openshift-nfd
 oc delete namespace openshift-nfd
+
+# Trustee
+oc delete trusteeconfig trusteeconfig -n trustee-operator-system
+oc delete namespace trustee-operator-system
 ```
 
 ---
