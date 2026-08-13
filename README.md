@@ -41,6 +41,9 @@ AI-powered classification from North Sea seismic data — running with a three-f
     - [Attempt to access the running container](#attempt-to-access-the-running-container)
     - [Try to change the policy](#try-to-change-the-policy)
     - [Try to change the container arguments](#try-to-change-the-container-arguments)
+    - [Try to run a different container](#try-to-run-a-different-container)
+    - [Try to serve a different container](#try-to-serve-a-different-container)
+    - [Closing thoughts on verifying confidential execution](#closing-thoughts-on-verifying-confidential-execution)
   - [Optional: Encrypt and publish your own model — model owner](#optional-encrypt-and-publish-your-own-model--model-owner)
   - [Optional: Build and publish your own application — model owner](#optional-build-and-publish-your-own-application--model-owner)
   - [What you've accomplished](#what-youve-accomplished)
@@ -2111,7 +2114,7 @@ the application fails to deploy with an error like this:
 
 ![Denied with argument change](docs/images/args-modification-denied.png)
 
-This is because in  [policies/policy-locked.rego](policies/policy-locked.rego) we only whitelist the
+This is because in [policies/policy-locked.rego](policies/policy-locked.rego) we only whitelist the
 allowed parameters/command line that can be used in this section:
 
 ```
@@ -2204,11 +2207,12 @@ before proceeding to the sections which follow.
 #### Try to run a different container 
 
 Since we can't change the arguments to the app container lets try to run a different container
-that would container our own code. By know we know that we'll have to use the same initdata
-that was registered so we'll use make install overriding the app image.
+that would contain our own code that exports the model weights. By know we know that we'll have
+to use the same initdata that was registered so we'll use make install overriding the app image
+to achieve this.
 
 Stop any earlier versions of the application with `make uninstall NAMESPACE=$NAMESPACE` and then
-start the application with
+start the application with:
 
 ```
 make install APP_IMG=quay.io/ubi9/ubi9-minimal:latest  NAMESPACE=$NAMESPACE
@@ -2258,14 +2262,68 @@ Since the initdata (which we can't change or the KBS won't release the key later
 policy and the image we used does not match one of the specified containers, we match the default
 rule which is to reject the image.
 
+In addition to the signature requirement we've also limited which containers the confidential vm
+can pull in this section in  [policies/policy-locked.rego](policies/policy-locked.rego):
+
 ```
-git checkout helm/templates/deployment.yaml
+# Only allow pulling images whose registry path matches an image_guest_pull source
+# declared in policy_data - blocks pulling arbitrary images inside the guest VM.
+PullImageRequest if {
+    some container in policy_data.containers
+    some allowed_storage in container.storages
+    allowed_storage.driver == "image_guest_pull"
+    startswith(input.image, allowed_storage.source)
+}
 ```
 
-before proceeding to the sections which follow.
+#### Try to serve a different container
 
-#### Try to run a different container 
+The last section confirmed we can't just specify a different container for the application, but since 
+the application deployer controls the environment maybe they could serve a different container
+when the `quay.io/rh-ai-quickstart/conf-gpu-accel-seismic-interp-deepseismic-app` container is requested.
 
+Since redirecting the pull would be a bit complicated we will simulate this by overriding the app image
+to pull a different version of the container (we've not limited the allowed containers to a specific
+version in the quickstart) .
+
+Stop any earlier versions of the application with `make uninstall NAMESPACE=$NAMESPACE` and then
+start the application with:
+
+```
+make install APP_IMG=quay.io/rh-ai-quickstart/conf-gpu-accel-seismic-interp-deepseismic-app:unsigned-image NAMESPACE=$NAMESPACE
+```
+
+You should see that the app containers is not pulled, with an error that says `Image policy rejected: Denied by policy: rejected by sigstoreSigned rule` like this:
+
+![Unsigned image fails](docs/images/sigstore-signed-denied.png)
+
+This failure is because we've configured the image policy in trustee such that the image must be signed by a key the model owner registered
+trustee. From the image policy:
+
+```
+   "transports": {
+        "docker": {
+            "quay.io/rh-ai-quickstart/conf-gpu-accel-seismic-interp-deepseismic-app": [
+                {
+                    "type": "sigstoreSigned",
+                    "keyPath": "kbs:///default/seismic-interpretation/cosign-key"
+                }
+            ],
+            "quay.io/rh-ai-quickstart/conf-gpu-accel-seismic-interp-deepseismic-model": [
+                {
+                    "type": "sigstoreSigned",
+                    "keyPath": "kbs:///default/seismic-interpretation/cosign-key"
+                }
+            ]
+        }
+    }
+```
+
+which says that the app and model containers must be signed by the key `kbs:///default/seismic-interpretation/cosign-key`
+which is only held by the model owner. So even if the application deployer can make the infrastructure serve
+a different container than that published by the model owner, the container will not start because it is not signed by the right key. 
+
+#### Closing thoughts on verifying confidential execution
 
 ### Optional: Encrypt and publish your own model — model owner
 
