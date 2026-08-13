@@ -22,7 +22,7 @@ from PIL import Image
 
 matplotlib.use("Agg")
 
-MODEL_PATH = os.getenv("MODEL_PATH", "/models-cache/dutchf3_unet_final.pth")
+MODEL_PATH = "/models-cache/dutchf3_unet_final.pth"
 PORT = int(os.getenv("PORT", "7860"))
 NUM_CLASSES = 6
 
