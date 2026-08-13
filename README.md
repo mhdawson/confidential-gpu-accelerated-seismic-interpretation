@@ -1052,7 +1052,8 @@ make verify-dcap
 
 ### Trustee setup — model owner (cluster-admin, once per cluster)
 
-> **In this quickstart** the application deployer also runs Trustee setup for demo convenience. In production this section is performed by the model owner on independently controlled infrastructure. Registering RVPS reference values and registering app-specific secrets with KBS are always model owner responsibilities regardless of deployment topology.
+> **In this quickstart** the person running the quickstart acts as both the application deployer and the model owner. Acting in the the model
+owner role, they run the Trustee install steps. In production this section is performed by the model owner on independently controlled infrastructure.
 
 #### Install Trustee
 
@@ -1168,8 +1169,6 @@ input.tdx.quote.body.mr_config_id in query_reference_value("mr_config_id")
 ```
 
 This requires that the `mr_config_id` value in the pod's TDX quote — which encodes the exact initdata the pod was launched with — matches one of the values registered in RVPS by `make set-rvps-values`. Any pod with different initdata (different KBS URL, certificate, namespace, or exec-deny policy) will fail the configuration check and be denied the key.
-
-`mr_config_id` must be registered in RVPS before applying this patch (run `make set-rvps-values` first), otherwise every pod will fail the configuration check.
 
 <details open>
 <summary>Make instructions</summary>
