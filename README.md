@@ -229,16 +229,14 @@ flowchart LR
 
 ### Minimum hardware requirements
 
-It is recommended that this quickstart only be deployed in a cluster not being used concurrently for other deployments. Installation requires multiple node reboots and applies configuration that may be incompatible with deployments not using confidential containers.
+**Note:** It is recommended that this quickstart only be deployed in a cluster not being used concurrently for other deployments. Installation requires multiple node reboots and applies configuration that may be incompatible with deployments not using confidential containers.
 
 | Component | Minimum | Notes |
 |---|---|---|
-| GPU | NVIDIA GPU with Confidential Computing mode support (e.g. H100, H200, B100) | Hopper architecture and later support NVIDIA CC mode and NRAS attestation. Consumer GPUs (RTX 3090, RTX 4090) and older data center GPUs (A100) do not support CC mode and cannot pass the NVIDIA attestation check. |
+| GPU | NVIDIA GPU with Confidential Computing mode support (e.g. H100, H200, B100) | Hopper architecture and later support NVIDIA CC mode and NRAS attestation. |
 | CPU | Intel® Xeon Scalable 4th Gen+ (Sapphire Rapids or later) with TDX, or AMD EPYC 9004 series (Genoa) with SEV-SNP | TEE must be enabled in the BIOS. TDX was introduced in 4th Gen Xeon Scalable (Sapphire Rapids). |
-| RAM | 128GB | The kata VM takes 24GB, OCP control plane requires ~32GB, and GPU/OSC/Trustee system pods consume additional memory. 64GB is insufficient in practice. |
-| Storage | 50GB | For ModelCar image cache |
-
-**NOTE:** A CPU TEE (Intel® TDX or AMD SEV-SNP) and NVIDIA CC mode are **both** hard requirements — the Key Broker Server will not release the model decryption key unless all three attestation checks pass.
+| RAM | 128GB | The kata VM takes 48GB, OCP control plane requires ~32GB, and GPU/OSC/Trustee system pods consume additional memory. |
+| Storage | 50GB | For OpenShift AI, OSC and trustee deployments|
 
 **NOTE:** At this point in time the quickstart has only been validated to work with Intel TDX; validation with AMD SEV-SNP is a work in progress.
 
@@ -247,9 +245,10 @@ It is recommended that this quickstart only be deployed in a cluster not being u
 | Software | Version | Notes |
 |---|---|---|
 | OpenShift Container Platform | 4.21.24+ | Required by OpenShift Sandboxed Containers 1.13 with confidential containers and GPU support (bare metal + GPU requires 4.21.24+) |
-| Red Hat OpenShift AI | 3.4+ | Provides the model serving stack and installs the NVIDIA GPU Operator (26.3.0 required for confidential GPU support with OSC 1.13) and CUDA runtime — install via OperatorHub |
+| OpenShift Sandboxed Containers | 1.13 | Provides the `kata-cc-nvidia-gpu` runtime class for confidential GPU workloads |
+| Red Hat OpenShift AI | 3.4+ | Provides the model serving stack and installs the NVIDIA GPU Operator (26.3.0 required for confidential GPU support with OSC 1.13) |
 | Trustee (KBS) | 1.1.0 | `confidential-containers/trustee` — Key Broker Server, deployed as part of this quickstart |
-| Cosign | 2.0+ | For verifying model image signatures; installed locally for the optional encrypt step and sign steps |
+| Cosign | 2.0+ | For verifying model image signatures; installed locally for the [Optional: Encrypt and publish your own model](#optional-encrypt-and-publish-your-own-model--model-owner) and [Optional: Build and publish your own application](#optional-build-and-publish-your-own-application--model-owner) sections |
 
 ### Network connectivity requirements
 
