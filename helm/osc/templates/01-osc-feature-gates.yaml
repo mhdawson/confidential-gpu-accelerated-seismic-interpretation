@@ -1,0 +1,11 @@
+# Named 01-osc-feature-gates.yaml so Helm applies it before kataconfig.yaml
+# (Helm applies resources alphabetically). This ConfigMap must exist before
+# KataConfig or OSC will create a non-confidential kata runtime.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: osc-feature-gates
+  namespace: openshift-sandboxed-containers-operator
+data:
+  confidential: "true"
+  deploymentMode: "MachineConfig"

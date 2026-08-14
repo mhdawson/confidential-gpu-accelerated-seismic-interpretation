@@ -1,0 +1,5 @@
+apiVersion: v2
+name: nfd-osc
+description: Node Feature Discovery and OpenShift Sandboxed Containers for kata-cc bare metal
+type: application
+version: 0.1.0

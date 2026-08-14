@@ -1,0 +1,16 @@
+# KataConfig for single-node clusters where the only node is in the master
+# MachineConfigPool.  The default kataconfig.yaml creates a kata-oc pool that
+# targets worker nodes; on SNO that pool has 0 members and nothing is installed.
+# Use this file instead when `oc get mcp worker -o jsonpath='{.status.machineCount}'`
+# returns 0.
+apiVersion: kataconfiguration.openshift.io/v1
+kind: KataConfig
+metadata:
+  name: example-kataconfig
+spec:
+  enablePeerPods: false
+  checkNodeEligibility: false
+  logLevel: info
+  kataConfigPoolSelector:
+    matchLabels:
+      pools.operator.machineconfiguration.openshift.io/master: ""

@@ -1,0 +1,11 @@
+apiVersion: trustedservices.intel.com/v1
+kind: TdxQuoteGenerationService
+metadata:
+  name: intel-tdx-dcap
+  namespace: intel-dcap
+spec:
+  platformRegistration:
+    Online:
+      apiKeySecretName: intel-pcs-api-key
+  nodeSelector:
+    - "feature.node.kubernetes.io/cpu-security.sgx.enabled=true"

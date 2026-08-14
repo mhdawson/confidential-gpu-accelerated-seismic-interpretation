@@ -3,13 +3,14 @@
 model-creation/model-weights/*.pth
 model-creation/model-weights/*.pth.enc
 
-# Cosign private key
-cosign.key
+# Cosign private keys — public keys (cosign.pub) are committed; only private keys are ignored
+model-owner-verification-keys/cosign.key
 
 # Local results and validation artefacts
 results/
 volve_validation/
-*.png
+results/*.png
+volve_validation/*.png
 
 # Python / editor artefacts
 __pycache__/

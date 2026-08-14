@@ -1,0 +1,5 @@
+apiVersion: v2
+name: trustee-kbs
+description: Trustee Key Broker Service for confidential seismic app attestation
+type: application
+version: 0.1.0

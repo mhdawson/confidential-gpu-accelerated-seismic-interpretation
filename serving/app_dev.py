@@ -1,29 +1,33 @@
 #!/usr/bin/env python3
+# /// script
+# requires-python = ">=3.10"
+# dependencies = [
+#   "gradio",
+#   "matplotlib",
+#   "numpy",
+#   "pillow",
+# ]
+# ///
 """
-Seismic Facies Classification — Gradio web UI.
+Dev-mode UI preview — no model, no torch, no smp required.
+Returns a random facies classification so you can inspect the Gradio layout
+without building or pushing images.
 
-At startup, loads the plaintext model weights from MODEL_PATH (decrypted by
-the model-decrypt init container via KBS/CDH attestation), then serves a
-file-upload interface where users upload a .npy seismic section and receive
-a colour-coded facies classification PNG.
+Usage:
+    make check-ui
 """
 import io
-import math
-import os
 
 import gradio as gr
 import matplotlib
 import matplotlib.colors as mcolors
 import matplotlib.pyplot as plt
 import numpy as np
-import segmentation_models_pytorch as smp
-import torch
 from PIL import Image
 
 matplotlib.use("Agg")
 
-MODEL_PATH = "/models-cache/dutchf3_unet_final.pth"
-PORT = int(os.getenv("PORT", "7860"))
+PORT = 7860
 NUM_CLASSES = 6
 
 FACIES_COLORS = ["#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd", "#8c564b"]
@@ -71,50 +75,16 @@ TABLE_DESCRIPTION = f"""
 | 5 | Zechstein Group | {_swatch("#8c564b", "Brown")} |
 """
 
-MODEL = None
-DEVICE = None
-
-
-def _load_model(device: torch.device) -> smp.Unet:
-    print(f"Loading model from {MODEL_PATH} ...")
-    state = torch.load(MODEL_PATH, map_location=device, weights_only=False)
-    if "model_state_dict" in state:
-        state = state["model_state_dict"]
-    model = smp.Unet(
-        encoder_name="resnet50",
-        encoder_weights=None,
-        in_channels=1,
-        classes=NUM_CLASSES,
-    ).to(device)
-    model.load_state_dict(state)
-    model.eval()
-    print("Model ready.")
-    return model
-
-
-def _pad32(arr: np.ndarray):
-    h, w = arr.shape
-    ph = (math.ceil(h / 32) * 32) - h
-    pw = (math.ceil(w / 32) * 32) - w
-    return np.pad(arr, ((0, ph), (0, pw)), mode="reflect"), h, w
-
-
-def _infer(section: np.ndarray) -> np.ndarray:
-    padded, oh, ow = _pad32(section.astype(np.float32))
-    normed = (padded - padded.mean()) / (padded.std() + 1e-8)
-    x = torch.from_numpy(normed).unsqueeze(0).unsqueeze(0).to(DEVICE)
-    with torch.no_grad():
-        return MODEL(x).argmax(dim=1).squeeze(0).cpu().numpy()[:oh, :ow]
-
 
 def classify(npy_file, count: int):
     if npy_file is None:
         raise gr.Error("Please upload a .npy file.")
+
     section = np.load(npy_file.name if hasattr(npy_file, "name") else npy_file)
     if section.ndim != 2:
         raise gr.Error(f"Expected a 2-D array, got shape {section.shape}")
 
-    pred = _infer(section)
+    pred = np.random.randint(0, NUM_CLASSES, section.shape)
 
     fig, axes = plt.subplots(1, 2, figsize=(14, 6))
     axes[0].imshow(section, cmap="gray", aspect="auto")
@@ -138,34 +108,23 @@ def classify(npy_file, count: int):
     return Image.open(buf), new_count, label
 
 
-def main():
-    global MODEL, DEVICE
+css = "footer { display: none !important; } .built-with { display: none !important; }"
 
-    DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    print(f"Device: {DEVICE}")
-    MODEL = _load_model(DEVICE)
+with gr.Blocks(title="Seismic Facies Classification") as demo:
+    gr.Markdown("# Seismic Facies Classification")
+    gr.Markdown(DESCRIPTION)
+    npy_input = gr.File(label="Seismic section (.npy)", file_types=[".npy"])
+    with gr.Row():
+        clear_btn = gr.ClearButton(components=[npy_input], value="Clear")
+        submit_btn = gr.Button("Submit", variant="primary")
+    count_state = gr.State(value=0)
+    counter = gr.Markdown(value='<span style="font-size: 1.5em;">Classifications requested: 0</span>')
+    output_image = gr.Image(label="Facies classification", type="pil")
+    gr.Markdown(TABLE_DESCRIPTION)
+    submit_btn.click(
+        fn=classify,
+        inputs=[npy_input, count_state],
+        outputs=[output_image, count_state, counter],
+    )
 
-    css = "footer { display: none !important; } .built-with { display: none !important; }"
-
-    with gr.Blocks(title="Seismic Facies Classification") as demo:
-        gr.Markdown("# Seismic Facies Classification")
-        gr.Markdown(DESCRIPTION)
-        npy_input = gr.File(label="Seismic section (.npy)", file_types=[".npy"])
-        with gr.Row():
-            clear_btn = gr.ClearButton(components=[npy_input], value="Clear")
-            submit_btn = gr.Button("Submit", variant="primary")
-        count_state = gr.State(value=0)
-        counter = gr.Markdown(value='<span style="font-size: 1.5em;">Classifications requested: 0</span>')
-        output_image = gr.Image(label="Facies classification", type="pil")
-        gr.Markdown(TABLE_DESCRIPTION)
-        submit_btn.click(
-            fn=classify,
-            inputs=[npy_input, count_state],
-            outputs=[output_image, count_state, counter],
-        )
-
-    demo.launch(server_name="0.0.0.0", server_port=PORT, css=css)
-
-
-if __name__ == "__main__":
-    main()
+demo.launch(server_name="0.0.0.0", server_port=PORT, css=css)

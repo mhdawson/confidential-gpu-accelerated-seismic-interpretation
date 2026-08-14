@@ -1,0 +1,5 @@
+nfd:
+  namespace: openshift-nfd
+
+osc:
+  namespace: openshift-sandboxed-containers-operator

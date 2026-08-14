@@ -1,0 +1,12 @@
+certManager:
+  channel: stable-v1
+
+trustee:
+  namespace: trustee-operator-system
+  channel: stable
+  csvVersion: v1.1.0
+
+kbs:
+  serviceType: ClusterIP
+  route:
+    enabled: true

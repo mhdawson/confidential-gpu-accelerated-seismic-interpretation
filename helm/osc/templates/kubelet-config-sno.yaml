@@ -1,0 +1,13 @@
+apiVersion: machineconfiguration.openshift.io/v1
+kind: KubeletConfig
+metadata:
+  name: kata-runtime-request-timeout
+spec:
+  machineConfigPoolSelector:
+    matchLabels:
+      machineconfiguration.openshift.io/role: master
+  kubeletConfig:
+    # CDH pulls and unpacks the app image (~4.6 GB compressed) from the registry
+    # inside the kata VM on every pod start. This takes longer than the default
+    # 2-minute kubelet runtimeRequestTimeout, so we extend it here.
+    runtimeRequestTimeout: "10m0s"

@@ -1,0 +1,12 @@
+apiVersion: confidentialcontainers.org/v1alpha1
+kind: TrusteeConfig
+metadata:
+  name: trusteeconfig
+  namespace: trustee-operator-system
+spec:
+  profileType: Restricted
+  kbsServiceType: ClusterIP
+  httpsSpec:
+    tlsSecretName: trustee-tls-cert
+  attestationTokenVerificationSpec:
+    tlsSecretName: trustee-token-cert

@@ -1,0 +1,10 @@
+# WARNING: Applying this CR triggers a node MachineConfig rollout — worker nodes
+# will reboot one at a time. Do not apply during a maintenance freeze.
+apiVersion: kataconfiguration.openshift.io/v1
+kind: KataConfig
+metadata:
+  name: example-kataconfig
+spec:
+  enablePeerPods: false
+  checkNodeEligibility: false
+  logLevel: info

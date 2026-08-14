@@ -1,0 +1,16 @@
+# Enables IOMMU passthrough — required for GPU passthrough into kata-cc VMs.
+# Both intel_iommu and amd_iommu are set; the kernel ignores the one that
+# does not apply to the host CPU.
+# Default role: master (single-node / SNO).  For multi-node clusters where
+# kata workloads run on worker nodes, change the role label to "worker".
+apiVersion: machineconfiguration.openshift.io/v1
+kind: MachineConfig
+metadata:
+  name: 100-iommu-kernel-args
+  labels:
+    machineconfiguration.openshift.io/role: master
+spec:
+  kernelArguments:
+    - intel_iommu=on
+    - amd_iommu=on
+    - iommu=pt

@@ -14,8 +14,14 @@ spec:
     metadata:
       labels:
         app.kubernetes.io/name: {{ .Release.Name }}
+      annotations:
+        io.katacontainers.config.hypervisor.cc_init_data: "{{ .Values.initdata }}"
+        io.katacontainers.config.hypervisor.default_memory: "{{ .Values.kataMemoryMiB }}"
+        io.katacontainers.config.hypervisor.kernel_params: "agent.guest_components_rest_api=all"
     spec:
+      automountServiceAccountToken: false
       runtimeClassName: {{ .Values.runtimeClassName }}
+      terminationGracePeriodSeconds: 120
       tolerations:
         {{- toYaml .Values.tolerations | nindent 8 }}
       initContainers:
@@ -30,19 +36,17 @@ spec:
         - name: app
           image: {{ .Values.app.image }}
           imagePullPolicy: Always
+          command: ["/bin/bash", "-c", "bash /app/decrypt.sh && python /app/app.py"]
           ports:
             - containerPort: 7860
               protocol: TCP
           env:
-            - name: MODEL_ENCRYPTION_KEY
-              valueFrom:
-                secretKeyRef:
-                  name: {{ .Release.Name }}-model-key
-                  key: MODEL_ENCRYPTION_KEY
-            - name: MODEL_PATH
-              value: /models-cache/dutchf3_unet_final.pth.enc
             - name: PORT
               value: "7860"
+            - name: KBS_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
           volumeMounts:
@@ -57,4 +61,5 @@ spec:
             failureThreshold: 6
       volumes:
         - name: models-cache
-          emptyDir: {}
+          emptyDir:
+            medium: Memory

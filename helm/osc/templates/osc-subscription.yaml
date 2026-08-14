@@ -1,0 +1,14 @@
+# installPlanApproval: Manual — prevents automatic upgrades from disrupting
+# a running kata/CoCo environment. The make target approves the InstallPlan
+# after subscription creation.
+apiVersion: operators.coreos.com/v1alpha1
+kind: Subscription
+metadata:
+  name: sandboxed-containers-operator
+  namespace: openshift-sandboxed-containers-operator
+spec:
+  channel: stable
+  name: sandboxed-containers-operator
+  source: redhat-operators
+  sourceNamespace: openshift-marketplace
+  installPlanApproval: Manual

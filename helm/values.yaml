@@ -4,23 +4,28 @@ app:
 modelcar:
   image: quay.io/rh-ai-quickstart/conf-gpu-accel-seismic-interp-deepseismic-model:0.1.0
 
-# Pass at install time: --set modelEncryptionKey="$MODEL_ENCRYPTION_KEY"
-# Never commit a real key here.
-modelEncryptionKey: ""
-
 runtimeClassName: kata-cc-nvidia-gpu
 
-tolerations:
-  - key: g5-gpu
-    operator: Exists
-    effect: NoSchedule
+# Built and encoded by make install — do not set manually.
+initdata: ""
+
+# KBS route URL — substituted into initdata at make install time.
+kbsUrl: ""
+
+tolerations: []
+
+# Initial RAM (MiB) for the kata VM. CDH unpacks all container images into
+# the VM's tmpfs before containers start, so this must exceed the total
+# uncompressed size of all images pulled inside the VM.
+# The app image is ~8.5 GB compressed. Both images must unpack into the VM's tmpfs.
+kataMemoryMiB: 49152   # 48 GB
 
 resources:
   limits:
-    nvidia.com/gpu: "1"
+    nvidia.com/pgpu: "1"
     cpu: "8"
-    memory: 24Gi
+    memory: 32Gi
   requests:
-    nvidia.com/gpu: "1"
+    nvidia.com/pgpu: "1"
     cpu: "4"
-    memory: 16Gi
+    memory: 24Gi
