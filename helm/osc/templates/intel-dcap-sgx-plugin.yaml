@@ -8,4 +8,4 @@ spec:
   provisionLimit: 110
   logLevel: 4
   nodeSelector:
-    intel.feature.node.kubernetes.io/sgx: "true"
+    feature.node.kubernetes.io/cpu-security.sgx.enabled: "true"

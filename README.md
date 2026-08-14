@@ -1015,6 +1015,10 @@ The Intel Device Plugin Operator manages the SGX Device Plugin DaemonSet that ex
 3. Select it (certified — Intel source)
 4. Click **Install**, set the namespace to `intel-dcap` (create it first if needed), set **Update approval** to **Manual**, click **Install**
 5. Go to **Operators → Installed Operators**, select namespace `intel-dcap`, approve the InstallPlan, wait for status **Succeeded**
+6. Apply the `SgxDevicePlugin` CR to expose `sgx.intel.com/enclave` and `sgx.intel.com/provision` resources on SGX-capable nodes — QGS uses these to ensure it is scheduled only on nodes with the correct hardware:
+   ```bash
+   oc apply -f helm/osc/templates/intel-dcap-sgx-plugin.yaml
+   ```
 
 #### Step 2: Install the Intel TDX DCAP Operator and deploy QGS
 

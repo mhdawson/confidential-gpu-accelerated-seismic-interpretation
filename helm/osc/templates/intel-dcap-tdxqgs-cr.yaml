@@ -8,4 +8,4 @@ spec:
     Online:
       apiKeySecretName: intel-pcs-api-key
   nodeSelector:
-    - "intel.feature.node.kubernetes.io/sgx=true"
+    - "feature.node.kubernetes.io/cpu-security.sgx.enabled=true"
