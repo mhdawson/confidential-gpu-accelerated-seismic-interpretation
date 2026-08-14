@@ -1696,11 +1696,41 @@ policy_data := {
 
 #### Register app-specific secrets with KBS
 
-Register the model decryption key, cosign public key, and image verification policy with KBS. Secrets are registered as a Kubernetes Secret in `trustee-operator-system` named after the deployment namespace; the Trustee operator mounts it into KBS via its `kbsSecretResources` mechanism.
+The following secrets must be registered in the Trustee KBS for the application:
 
-The `image-policy` entry is a containers-policy.json document that requires sigstore-signed images for the app and model repos, verified against `kbs:///default/$NAMESPACE/cosign-key`. The CDH inside the kata guest fetches this policy from KBS at pod startup via `image_security_policy_uri` in its configuration and enforces it during image pull — an unsigned or incorrectly signed image is rejected before any container runs. This is the "executables" factor of the three-factor attestation check.
+* cosign public key - the key used to verify the signatures on the application containers
+* image policy - the image verification policy specified in the initdata
+* model encryption key - the key needed to decrypt the model weights
 
-The published quickstart images are pre-signed and `model-owner-verification-keys/cosign.pub` is already committed to this repository. If you are publishing your own images, see [Optional: Build and publish your own application](#optional-build-and-publish-your-own-application--model-owner) first.
+The image policy is a containers-policy.json document that requires sigstore-signed images for the app and model repos, verified against `kbs:///default/$NAMESPACE/cosign-key`. The CDH inside the kata guest fetches this policy from KBS at pod startup via `image_security_policy_uri` in its configuration and enforces it during image pull — an unsigned or incorrectly signed image is rejected before any container runs. This is the "executables" factor of the three-factor attestation check. The image policy is as follows:
+
+```
+{
+    "default": [
+        {
+            "type": "reject"
+        }
+    ],
+    "transports": {
+        "docker": {
+            "quay.io/rh-ai-quickstart/conf-gpu-accel-seismic-interp-deepseismic-app": [
+                {
+                    "type": "sigstoreSigned",
+                    "keyPath": "kbs:///default/seismic-interpretation/cosign-key"
+                }
+            ],
+            "quay.io/rh-ai-quickstart/conf-gpu-accel-seismic-interp-deepseismic-model": [
+                {
+                    "type": "sigstoreSigned",
+                    "keyPath": "kbs:///default/seismic-interpretation/cosign-key"
+                }
+            ]
+        }
+    }
+}
+```
+
+The published quickstart images are pre-signed and `model-owner-verification-keys/cosign.pub` is already committed to this repository. This is the public key which is registered. If you are publishing your own images, see [Optional: Build and publish your own application](#optional-build-and-publish-your-own-application--model-owner) first.
 
 The model encryption key for the published quickstart model is:
 
@@ -1713,7 +1743,8 @@ MODEL_ENCRYPTION_KEY=7f27f40d746b5d92c2d2fe744096b0712ef9951955de9773b3eb20e2be0
 <details open>
 <summary>Make instructions</summary>
 
-To automatically register app-specific KBS secrets:
+To automatically register app-specific KBS secrets, set MODEL_ENCRYPTION_KEY in your environment using
+the value shared earlier and then run:
 
 ```bash
 make register-secrets-with-kbs NAMESPACE=$NAMESPACE MODEL_ENCRYPTION_KEY=$MODEL_ENCRYPTION_KEY
