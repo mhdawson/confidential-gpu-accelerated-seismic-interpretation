@@ -1,4 +1,4 @@
-# Deploy Confidential GPU-Accelerated Seismic Interpretation
+A Deploy Confidential GPU-Accelerated Seismic Interpretation
 
 AI-powered classification from North Sea seismic data — run this quickstart within a confidential container on Red Hat® OpenShift® AI.
 
@@ -2140,12 +2140,12 @@ git checkout policies/policy-locked.rego
 git checkout scripts/build-initdata.py
 ```
 
-before moving on to the next sections.
+before moving on to the following section.
 
 #### Try to change the container arguments
 
 What if we try to run something different inside the container by changing the parameters passed
-when the container is started? These are defined in [helm/templates/deployment](helm/templates/deployment.yaml) in
+when the container is started? These are defined in [helm/templates/deployment.yaml](helm/templates/deployment.yaml) in
 the following section:
 
 ```
@@ -2172,8 +2172,8 @@ application fails to deploy with an error like this:
 
 ![Pod failing to start because the Kata policy denied the modified container arguments](docs/images/args-modification-denied.png)
 
-This is because in [policies/policy-locked.rego](policies/policy-locked.rego) we only whitelist the
-allowed parameters/command line that can be used in this section:
+This is because in [policies/policy-locked.rego](policies/policy-locked.rego) we set the allowed
+allowed arguments/command line that can be used in this section:
 
 ```
 CreateContainerRequest if {
@@ -2251,8 +2251,8 @@ and more specifically because for the app container we've only allowed the expec
 ```
 
 We know from the earlier section where we tried to change the policy to allow exec that the KBS will not
-release the key, so we've just confirmed the application deployer will not be able to start the container
-with arguments other than those allowed.
+release the key if we change the policy in the local initdata, so we've just confirmed the application
+deployer will not be able to start the container with arguments other than those allowed.
 
 Revert the deployment file back to its original version with
 
@@ -2341,8 +2341,8 @@ the application deployer controls the environment, maybe they could serve a diff
 when the `quay.io/rh-ai-quickstart/conf-gpu-accel-seismic-interp-deepseismic-app` container is requested.
 
 Since redirecting the pull would be a bit complicated, we will simulate this by overriding the app image
-to pull a different version of the container (we've not limited the allowed containers to a specific
-version in the quickstart).
+to pull a different version of the container that we have not signed (we've not limited the allowed
+containers to a specific version in the quickstart).
 
 Stop any earlier versions of the application with `make uninstall NAMESPACE=$NAMESPACE` and then
 start the application with:
@@ -2384,12 +2384,12 @@ a different container than that published by the model owner, the container will
 #### Closing thoughts on verifying confidential execution
 
 The combination of confidential containers, signed images and a good policy can protect the model weights from being
-exposed outside of the container. Achieving this requires
+exposed outside of the container. Achieving this requires:
 
 1. that the application is designed, built and deployed carefully to avoid exposing sensitive information through the channels allowed by the policy.
    For example, if the policy allows logs to be exported, ensure that these logs do not contain any information that should not be exported.
 1. a comprehensive understanding of each element in the policy (in our case [policies/policy-locked.rego](policies/policy-locked.rego)) — specifically what each rule that is not set to `false` permits, and how it might lead to disclosure in the context of the application being run. This document provides
-   documentation on the different elements [IBM Confidential Computing Containers for Red Hat OpenShift Container Platform](https://www.ibm.com/docs/en/ccco/1.2.2?topic=contract-rego-policy-rules-snippets). The policy needs to be configured correctly based on the application being deployed, the
+   documentation on the different elements - [IBM Confidential Computing Containers for Red Hat OpenShift Container Platform](https://www.ibm.com/docs/en/ccco/1.2.2?topic=contract-rego-policy-rules-snippets). The policy needs to be configured correctly based on the application being deployed, the
    environment, and the threats you need to protect against.
 1. careful management of the initdata which is registered with trustee to ensure that keys are only released to the approved containers running 
    constrained by the appropriate policy.
@@ -2448,24 +2448,19 @@ Signs the pushed ModelCar image with your model owner private key for supply cha
 
 #### After publishing
 
-Update `helm/values.yaml` to point to your new image:
-
-```yaml
-modelcar:
-  image: quay.io/myorg/conf-gpu-accel-seismic-interp-model:v1
-```
-
-Update the cosign key stored in KBS — patch just the `cosign-key` field in the namespace Secret and restart Trustee:
-
-```bash
-COSIGN_KEY_B64=$(base64 -w0 model-owner-verification-keys/cosign.pub)
-oc patch secret "$NAMESPACE" \
-    -n trustee-operator-system \
-    --type merge \
-    -p "{\"data\":{\"cosign-key\":\"$COSIGN_KEY_B64\"}}"
-oc rollout restart deployment/trustee-deployment -n trustee-operator-system
-oc rollout status deployment/trustee-deployment -n trustee-operator-system --timeout=2m
-```
+* Update the modelcar image in `helm/values.yaml` to point to your new image name (if you changed it)
+* Update [policies/policy-locked.rego](policies/policy-locked.rego) to reflect the new images name (if you changed it)
+* Update the signing policy generated by [scripts/build-initdata.py](scripts/build-initdata.py] to reflect the new image name (if you changed it)
+* Update the cosign key stored in the KBS to be the key you used to sign the image (if you changed it)  — patch just the `cosign-key` field in the namespace Secret and restart Trustee:
+  ```bash
+  COSIGN_KEY_B64=$(base64 -w0 model-owner-verification-keys/cosign.pub)
+  oc patch secret "$NAMESPACE" \
+      -n trustee-operator-system \
+      --type merge \
+      -p "{\"data\":{\"cosign-key\":\"$COSIGN_KEY_B64\"}}"
+  oc rollout restart deployment/trustee-deployment -n trustee-operator-system
+  oc rollout status deployment/trustee-deployment -n trustee-operator-system --timeout=2m
+  ```
 
 Then re-run the deploy steps from [Step 2](#step-2-deploy-the-application) onwards.
 
@@ -2482,12 +2477,6 @@ This is not required to run the quickstart. The steps below are for model owners
 - `podman login quay.io` authenticated to a namespace where you can push
 - `cosign` 3.1.2+
 - A model owner key pair in `model-owner-verification-keys/` — generate one with `make generate-model-owner-keys` if you have not already done so (see [Optional: Encrypt and publish your own model](#optional-encrypt-and-publish-your-own-model))
-
-**Why the model owner signs the application image**
-
-KBS enforces a three-factor attestation check before releasing the model decryption key. The third factor — executables — verifies that the pod is running an application image signed by the model owner's private key. This is the mechanism that binds the model decryption key to a specific, approved application: even if an attacker gains access to the encrypted model in the registry, they cannot decrypt it without running the cosign-signed app inside a genuine hardware TEE.
-
-Signing is done by the model owner (the party who controls the decryption key) because they are the one deciding which application code is trusted to handle their model.
 
 #### Step 1: Build the application image
 
@@ -2515,24 +2504,19 @@ Signs the pushed application image with the model owner private key (`model-owne
 
 #### After publishing
 
-Update `helm/values.yaml` to point to your new image:
-
-```yaml
-app:
-  image: quay.io/myorg/conf-gpu-accel-seismic-interp-deepseismic-app:v1
-```
-
-If you also generated a new key pair, update the cosign key stored in KBS — patch just the `cosign-key` field in the namespace Secret and restart Trustee:
-
-```bash
-COSIGN_KEY_B64=$(base64 -w0 model-owner-verification-keys/cosign.pub)
-oc patch secret "$NAMESPACE" \
-    -n trustee-operator-system \
-    --type merge \
-    -p "{\"data\":{\"cosign-key\":\"$COSIGN_KEY_B64\"}}"
-oc rollout restart deployment/trustee-deployment -n trustee-operator-system
-oc rollout status deployment/trustee-deployment -n trustee-operator-system --timeout=2m
-```
+* Update the app image in `helm/values.yaml` to point to your new image name (if you changed it)
+* Update [policies/policy-locked.rego](policies/policy-locked.rego) to reflect the new images name (if you changed it)
+* Update the signing policy generated by [scripts/build-initdata.py](scripts/build-initdata.py] to reflect the new image name (if you changed it)
+* Update the cosign key stored in the KBS to be the key you used to sign the image (if you changed it)  — patch just the `cosign-key` field in the namespace Secret and restart Trustee:
+  ```bash
+  COSIGN_KEY_B64=$(base64 -w0 model-owner-verification-keys/cosign.pub)
+  oc patch secret "$NAMESPACE" \
+      -n trustee-operator-system \
+      --type merge \
+      -p "{\"data\":{\"cosign-key\":\"$COSIGN_KEY_B64\"}}"
+  oc rollout restart deployment/trustee-deployment -n trustee-operator-system
+  oc rollout status deployment/trustee-deployment -n trustee-operator-system --timeout=2m
+  ```
 
 Then re-run the deploy steps from [Step 2](#step-2-deploy-the-application) onwards.
 
@@ -2540,8 +2524,9 @@ Then re-run the deploy steps from [Step 2](#step-2-deploy-the-application) onwar
 
 ### What you've accomplished
 
-**Deployed a fully attested confidential AI pipeline for geoscience:**
-- ✓ The model decryption key was released only after three independent attestation checks passed: the application container (`conf-gpu-accel-seismic-interp-app`) cosign signature verified by the model owner's key, NVIDIA CC mode confirmed on the GPU, and CPU TEE verified (Intel® TDX or AMD SEV-SNP)
+In this quickstart you have:
+- ✓ Deployed a fully attested confidential AI pipeline for geoscience
+- ✓ The model decryption key was released only after the attestation checks passed: the application container (`conf-gpu-accel-seismic-interp-app`) cosign signature verified by the model owner's key, NVIDIA CC mode confirmed on the GPU, and CPU TEE verified (Intel® TDX or AMD SEV-SNP)
 - ✓ The model weights were encrypted at rest in quay.io and decrypted only inside the hardware Trust Domain — never exposed on disk or in untrusted memory
 - ✓ Seismic data uploaded by the user was processed entirely within TEE-encrypted memory
 - ✓ Produced a rock type classification for a seismic section in seconds
