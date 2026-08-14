@@ -34,7 +34,6 @@ AI-powered classification from North Sea seismic data — run this quickstart wi
     - [Step 3: Get the application URL](#step-3-get-the-application-url)
   - [Use the application](#use-the-application)
     - [Upload seismic data](#upload-seismic-data)
-    - [Run classification](#run-classification)
     - [View results](#view-results)
   - [Verify confidential execution](#verify-confidential-execution)
     - [Attempt to access the running container](#attempt-to-access-the-running-container)
@@ -1702,7 +1701,7 @@ The following secrets must be registered in the Trustee KBS for the application:
 * image policy - the image verification policy specified in the initdata
 * model encryption key - the key needed to decrypt the model weights
 
-The image policy is a containers-policy.json document that requires sigstore-signed images for the app and model repos, verified against `kbs:///default/$NAMESPACE/cosign-key`. The CDH inside the kata guest fetches this policy from KBS at pod startup via `image_security_policy_uri` in its configuration and enforces it during image pull — an unsigned or incorrectly signed image is rejected before any container runs. This is the "executables" factor of the three-factor attestation check. The image policy is as follows:
+The image policy is a containers-policy.json document that requires sigstore-signed images for the app and model repos, verified against `kbs:///default/$NAMESPACE/cosign-key`. The CDH inside the kata guest fetches this policy from KBS at pod startup via `image_security_policy_uri` in its configuration and enforces it during image pull — an unsigned or incorrectly signed image is rejected before any container runs. This is the "executables" factor of the three-factor attestation check. The image policy is as follows when using the default namespace:
 
 ```
 {
@@ -1855,36 +1854,17 @@ Open the printed URL in your browser.
 **Expected outcome:**
 - ✓ The results image appears below the buttons showing the seismic input alongside the predicted facies classification
 
-#### Run classification
-
-The U-Net ResNet-50 model classifies every pixel in the uploaded section as one of six North Sea rock types. Classification runs on the GPU and completes in seconds.
-
-**Expected outcome:**
-- ✓ A side-by-side image is displayed: seismic input (greyscale) on the left, colour-coded facies prediction on the right
-- ✓ A legend below the image labels each colour with its formation name
-
 #### View results
 
 The output image shows two panels side by side:
+
+![Gradio web UI showing a seismic section input on the left and a colour-coded predicted facies classification on the right](docs/images/app-ui.png)
 
 **Left — seismic input**: the uploaded section rendered in greyscale.
 
 **Right — predicted facies**: each pixel coloured by predicted rock type:
 
-| Colour | Rock Type | Petroleum Significance |
-|---|---|---|
-| Blue | Upper North Sea Group | Overburden — above the field |
-| Orange | Middle North Sea Group | Overburden |
-| Green | Lower North Sea Group | Overburden |
-| Red | Rijnland / Chalk Group | Seal rock — traps the oil beneath |
-| Purple | Scruff Group | Transition zone |
-| Brown | Zechstein Group | Deep salt — structural trap |
-
 Click **Clear** to reset and upload a different section.
-
-The UI should look like this after you have requested a prediction:
-
-![Gradio web UI showing a seismic section input on the left and a colour-coded predicted facies classification on the right](docs/images/app-ui.png)
 
 ### Verify confidential execution
 
