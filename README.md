@@ -249,6 +249,13 @@ flowchart LR
 | Red Hat OpenShift AI | 3.4+ | Provides the model serving stack and installs the NVIDIA GPU Operator (26.3.0 required for confidential GPU support with OSC 1.13) |
 | Trustee (KBS) | 1.1.0 | `confidential-containers/trustee` — Key Broker Server, deployed as part of this quickstart |
 | Cosign | 2.0+ | For verifying model image signatures; installed locally for the [Optional: Encrypt and publish your own model](#optional-encrypt-and-publish-your-own-model--model-owner) and [Optional: Build and publish your own application](#optional-build-and-publish-your-own-application--model-owner) sections |
+| [Python](https://www.python.org/downloads/) | 3.12 – 3.13 | Required locally for the optional model encryption and application build steps |
+| [uv](https://github.com/astral-sh/uv) | Latest | Fast Python package installer; used to manage dependencies for the optional local steps |
+| [Podman](https://podman.io/getting-started/installation) | Latest | Container runtime for building and pushing images in the optional build steps |
+| [Helm](https://helm.sh/docs/intro/install/) | 3.0+ | Kubernetes package manager; used to deploy the application |
+| [oc CLI](https://docs.openshift.com/container-platform/latest/cli_reference/openshift_cli/getting-started-cli.html) | Matching OCP version | OpenShift command-line tool |
+| [git](https://git-scm.com/downloads) | Latest | Required to clone this repository |
+| [GNU Make](https://www.gnu.org/software/make/) | Latest | Build automation; pre-installed on most Linux and macOS systems |
 
 ### Network connectivity requirements
 
