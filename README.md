@@ -1227,20 +1227,28 @@ oc rollout status deployment/trustee-deployment -n trustee-operator-system --tim
 
 #### Register RVPS reference values
 
-The attestation policy requires the following values in RVPS before it will release the model key:
+The default trustee policy patched to add mr_config_id as covered in the earlier section verifies the following
+values in RVPS before it will release the model key. One of the set of registered RVPS values must match:
 
 | Name | What it covers | Varies by |
 |---|---|---|
 | `mr_config_id` | Initdata hash — binds the pod to the KBS URL, KBS TLS cert, namespace, image repos, and exec-deny policy | Namespace, KBS cert, app/model image repos, policy mode |
-| `td_attributes` | TDX TD feature flags (e.g. debug mode disabled) | Hardware / OSC version |
 | `mr_td` | OVMF firmware measurement | OSC version |
 | `xfam` | QEMU CPU feature mask | OSC version / runtime class |
-| `rtmr_0` | UEFI firmware measurement | OSC version |
 | `rtmr_1` | kata kernel + initrd measurement | OSC version |
 | `rtmr_2` | Additional boot measurement | OSC version |
+
+In addition it can be modified to validate the following values:
+
+| Name | What it covers | Varies by |
+|---|---|---|
+| `td_attributes` | TDX TD feature flags (e.g. debug mode disabled) | Hardware / OSC version |
+| `rtmr_0` | UEFI firmware measurement | OSC version |
 | `rtmr_3` | Runtime configuration measurement | OSC version |
 
-`mr_config_id` is computed at registration time from the full initdata blob: it covers the KBS URL, KBS TLS certificate, namespace, app and model image repos, and the exec-deny policy (policy.rego). Any change to any of these requires re-running `make set-rvps-values`. The TDX hardware measurements are stable for a given OSC version — the Makefile already contains the correct values for OSC **1.13.1** (see the `TDX_MR_TD` block near `KATA_RUNTIME_CLASS` in the Makefile).
+In the quickstart, the `mr_config_id` is computed at registration time from the full initdata blob: it covers the KBS URL, KBS TLS certificate, namespace, app and model image repos, and the exec-deny policy (policy.rego). For the quickstart we have generated and captured the required values for the other entries for OSC 1.13.1 and included a make target that can be used to capture those values if you are using a different OSC version. For production deployments [veritas](https://github.com/confidential-devhub/veritas) is a tool that can help the model owner get the RVPS values needed without needing to have access to the application deployer's environment.
+
+In the quickstart we set all of the values when registering RVPS values. Any change to any of these requires re-running `make set-rvps-values`. The TDX hardware measurements are stable for a given OSC version — the Makefile already contains the correct values for OSC **1.13.1** (see the `TDX_MR_TD` block near `KATA_RUNTIME_CLASS` in the Makefile).
 
 <details open>
 <summary>Make instructions</summary>
