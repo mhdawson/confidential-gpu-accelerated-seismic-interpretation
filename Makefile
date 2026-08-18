@@ -33,7 +33,7 @@ INTEL_API_KEY       ?=
 RUNTIME_CLASS       ?= nvidia
 KATA_RUNTIME_CLASS    ?= kata-cc-nvidia-gpu
 POLICY_MODE           ?= locked
-# TDX infrastructure reference values for OSC 1.13.1 / kata-cc-nvidia-gpu.
+# TDX infrastructure reference values for OSC 1.13.0 / kata-cc-nvidia-gpu.
 # Re-run scripts/collect-tdx-measurements.sh and update these after an OSC upgrade.
 TDX_MR_SEAM      ?=
 TDX_TD_ATTRIBUTES ?= 0000001000000000
