@@ -1817,11 +1817,15 @@ On startup the pod goes through the following sequence inside the kata VM:
 
 3. **Application container**: runs `decrypt.sh` first — CDH uses its KBS session (established via TDX + GPU attestation) to retrieve the model decryption key, which `decrypt.sh` uses to decrypt `.pth.enc` → `.pth` on the shared volume and then delete the key from local storage. The app then loads the plaintext model and starts the Gradio UI on port 7860.
 
-Wait for both init containers to complete and the app container to reach `Running`:
+Wait for both init containers to complete and the app container to reach `Running` (this can take 5 minutes or so and the container may
+show with a CreateContainerError along the way):
 
 ```bash
 oc get pods -n $NAMESPACE -w
 ```
+
+**NOTE:** Stopping the application with `make uninstall NAMESPACE=$NAMESPACE` can also take a little while and it is good
+practice to make sure it completes before trying to install the application again.
 
 #### Step 3: Get the application URL
 
@@ -2372,6 +2376,8 @@ which says that the app and model containers must be signed by the key `kbs:///d
 which is only held by the model owner. So even if the application deployer can make the infrastructure serve
 a different container than that published by the model owner, the container will not start because it is not signed by the right key. 
 
+Stop the application with `make uninstall NAMESPACE=$NAMESPACE` before continuing.
+
 #### Closing thoughts on verifying confidential execution
 
 The combination of confidential containers, signed images and a good policy can protect the model weights from being
@@ -2399,7 +2405,7 @@ This is not required to run the quickstart. The steps below are for model owners
 - `MODEL_ENCRYPTION_KEY` set in your environment (the AES-256-CBC key used during training)
 - `podman login quay.io` authenticated
 - `cosign` 3.1.2+
-- The trained weights at `model-creation/model-weights/dutchf3_unet_final.pth` — copy them from the training PVC first with `make get-model NAMESPACE=$NAMESPACE`
+- The trained weights at `model-creation/model-weights/dutchf3_unet_final.pth` — copy them from the training PVC first with `make get-model NAMESPACE=$NAMESPACE`. Refer to i[model-creation/README.md](model-creation/README.d) for detailed instructions on how to generate the model in the training PVC.
 
 #### Step 1: Generate a signing key pair
 
