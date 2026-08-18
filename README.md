@@ -2051,7 +2051,7 @@ and you should see an entry like the following which shows that the kbs is refus
 
 The deployment fails early as it tries to get the image policy from the KBS, but what if we remove the image policy which requires signatures from the initdata?
 
-Do that by removing the [image] and image_security_policy_uri lines in build-initdata.py
+Do that by removing the [image] and image_security_policy_uri lines in scripts/build-initdata.py
 
 ```
 diff --git a/scripts/build-initdata.py b/scripts/build-initdata.py
