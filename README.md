@@ -244,9 +244,9 @@ flowchart LR
 | Software | Version | Notes |
 |---|---|---|
 | [OpenShift Container Platform](https://docs.redhat.com/en/documentation/openshift_container_platform) | 4.21.24+ | Required by OpenShift Sandboxed Containers 1.13 with confidential containers and GPU support (bare metal + GPU requires 4.21.24+) |
-| [OpenShift Sandboxed Containers](https://docs.redhat.com/en/documentation/openshift_sandboxed_containers/1.13.1) | 1.13.1 | Provides the `kata-cc-nvidia-gpu` runtime class for confidential GPU workloads |
+| [OpenShift Sandboxed Containers](https://docs.redhat.com/en/documentation/openshift_sandboxed_containers/1.13) | 1.13.0 | Provides the `kata-cc-nvidia-gpu` runtime class for confidential GPU workloads |
 | [Red Hat OpenShift AI](https://www.redhat.com/en/technologies/cloud-computing/openshift/openshift-ai) | 3.4+ | Provides the model serving stack and installs the NVIDIA GPU Operator (26.3.0 required for confidential GPU support with OSC 1.13) |
-| [Trustee (KBS)](https://github.com/confidential-containers/trustee) | 1.1.0 | `confidential-containers/trustee` — Key Broker Server, deployed as part of this quickstart |
+| [Trustee (KBS)](https://github.com/confidential-containers/trustee) | 1.2.0 | `confidential-containers/trustee` — Key Broker Server, deployed as part of this quickstart |
 | [Cosign](https://docs.sigstore.dev/cosign/overview/) | 2.0+ | For verifying model image signatures; installed locally for the [Optional: Encrypt and publish your own model](#optional-encrypt-and-publish-your-own-model--model-owner) and [Optional: Build and publish your own application](#optional-build-and-publish-your-own-application--model-owner) sections |
 | [Python](https://www.python.org/downloads/) | 3.12 – 3.13 | Required locally for a number of the make targets |
 | [uv](https://github.com/astral-sh/uv) | Latest | Fast Python package installer; used to manage dependencies for the optional local steps |
@@ -524,19 +524,7 @@ Verify that output indicates that everything is installed as expected:
   PASS: 24   FAIL: 0   WARN: 0
 ```
 
-> **Intel TDX: Provisioning Certificate Caching Service (PCCS)**
->
-> When a TDX pod generates an attestation quote, the quote must be verified against Intel's certificate chain to prove the CPU is genuine Intel hardware running legitimate TDX firmware. By default, the attestation agent fetches these certificates directly from Intel's online Provisioning Certificate Service (PCS) on each attestation.
->
-> Running a local **Provisioning Certificate Caching Service (PCCS)** is recommended even when outbound internet access is not restricted, for several reasons:
-> - **Reliability** — attestation does not fail if Intel's online PCS is temporarily unavailable.
-> - **Performance** — a local cache eliminates per-attestation round-trip latency to Intel's servers.
-> - **Privacy** — without PCCS, every TDX node calls Intel's PCS directly, letting Intel observe per-platform activity. With PCCS, only the caching service contacts Intel.
-> - **Compliance** — in regulated environments, having a single auditable egress point for Intel certificate fetching is easier to control than every node reaching the internet independently.
->
-> PCCS only serves Intel-signed certificates — a compromised PCCS cannot forge trust or produce fake attestation quotes, since all certificates are verified against Intel's root CA. However, a stale or tampered PCCS could serve outdated revocation lists (CRLs) or TCB (Trusted Computing Base) data, which would prevent the system from detecting known vulnerabilities in platform firmware. For this reason, PCCS should run on trusted, well-maintained infrastructure — not on the same untrusted workload cluster — and should be kept updated so that revocation and TCB information stays current.
->
-> This quickstart deploys QGS via the Intel TDX DCAP Operator using `platformRegistration.Online` — QGS contacts Intel PCS directly with an API key, so no local PCCS is required. AMD SEV-SNP does not require QGS or PCCS.
+Make sure that all checks pass before moving to the next section.
 
 ---
 
@@ -705,8 +693,7 @@ If the label is not present, the BIOS settings are not correctly saved — revis
 1. Go to **Operators → OperatorHub**
 2. Search for "OpenShift sandboxed containers"
 3. Select **OpenShift sandboxed containers operator** (Red Hat source)
-4. Click **Install**, leave defaults (namespace: `openshift-sandboxed-containers-operator`), set **Update approval** to **Manual**, click **Install**
-   > **Minimum version: 1.13**
+4. Click **Install**, leave defaults (namespace: `openshift-sandboxed-containers-operator`), set **Update approval** to **Manual**, set **Starting version** to `sandboxed-containers-operator.v1.13.0`, click **Install**
 5. Go to **Operators → Installed Operators**, select namespace `openshift-sandboxed-containers-operator`, click **Upgrade available** and approve the InstallPlan
 6. Wait until the status shows **Succeeded**
 
@@ -1099,8 +1086,9 @@ To manually install Trustee:
 6. Set **Installation mode** to "A specific namespace"
 7. Under **Installed Namespace**, select **Create namespace** and enter `trustee-operator-system`
 8. Set **Update approval** to **Manual**
-9. Click **Install**, then go to **Operators → Installed Operators**, select namespace `trustee-operator-system`, click **Upgrade available** and approve the InstallPlan
-10. Wait until the status shows **Succeeded**
+9. Set **Starting version** to `trustee-operator.v1.2.0`
+10. Click **Install**, then go to **Operators → Installed Operators**, select namespace `trustee-operator-system`, click **Upgrade available** and approve the InstallPlan
+11. Wait until the status shows **Succeeded**
 
 #### Step 2: Create the cert-manager Issuer and TLS Certificates
 
@@ -1829,11 +1817,15 @@ On startup the pod goes through the following sequence inside the kata VM:
 
 3. **Application container**: runs `decrypt.sh` first — CDH uses its KBS session (established via TDX + GPU attestation) to retrieve the model decryption key, which `decrypt.sh` uses to decrypt `.pth.enc` → `.pth` on the shared volume and then delete the key from local storage. The app then loads the plaintext model and starts the Gradio UI on port 7860.
 
-Wait for both init containers to complete and the app container to reach `Running`:
+Wait for both init containers to complete and the app container to reach `Running` (this can take 5 minutes or so and the container may
+show with a CreateContainerError along the way):
 
 ```bash
 oc get pods -n $NAMESPACE -w
 ```
+
+**NOTE:** Stopping the application with `make uninstall NAMESPACE=$NAMESPACE` can also take a little while and it is good
+practice to make sure it completes before trying to install the application again.
 
 #### Step 3: Get the application URL
 
@@ -2004,8 +1996,7 @@ oc exec -n $NAMESPACE $POD -c app -- /bin/sh
 
 **Expected outcome:**
 ```
-Error from server: admission webhook denied the request:
-kata-agent policy: ExecProcessRequest is not permitted
+error: Internal error occurred: error executing command in container: cannot enter container 4a1584dbe11077c5fcce3d14e72a9636b4a8d2f0ea331d8136922264286a1e36, with err rpc error: code = PermissionDenied desc = "ExecProcessRequest is blocked by policy: ": unknown
 ```
 
 Try the same through the OpenShift web console:
@@ -2064,7 +2055,7 @@ and you should see an entry like the following which shows that the kbs is refus
 
 The deployment fails early as it tries to get the image policy from the KBS, but what if we remove the image policy which requires signatures from the initdata?
 
-Do that by removing the [image] and image_security_policy_uri lines in build-initdata.py
+Do that by removing the [image] and image_security_policy_uri lines in scripts/build-initdata.py
 
 ```
 diff --git a/scripts/build-initdata.py b/scripts/build-initdata.py
@@ -2385,6 +2376,8 @@ which says that the app and model containers must be signed by the key `kbs:///d
 which is only held by the model owner. So even if the application deployer can make the infrastructure serve
 a different container than that published by the model owner, the container will not start because it is not signed by the right key. 
 
+Stop the application with `make uninstall NAMESPACE=$NAMESPACE` before continuing.
+
 #### Closing thoughts on verifying confidential execution
 
 The combination of confidential containers, signed images and a good policy can protect the model weights from being
@@ -2412,7 +2405,7 @@ This is not required to run the quickstart. The steps below are for model owners
 - `MODEL_ENCRYPTION_KEY` set in your environment (the AES-256-CBC key used during training)
 - `podman login quay.io` authenticated
 - `cosign` 3.1.2+
-- The trained weights at `model-creation/model-weights/dutchf3_unet_final.pth` — copy them from the training PVC first with `make get-model NAMESPACE=$NAMESPACE`
+- The trained weights at `model-creation/model-weights/dutchf3_unet_final.pth` — copy them from the training PVC first with `make get-model NAMESPACE=$NAMESPACE`. Refer to i[model-creation/README.md](model-creation/README.d) for detailed instructions on how to generate the model in the training PVC.
 
 #### Step 1: Generate a signing key pair
 

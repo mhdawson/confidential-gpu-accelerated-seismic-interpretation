@@ -11,4 +11,5 @@ spec:
   name: sandboxed-containers-operator
   source: redhat-operators
   sourceNamespace: openshift-marketplace
+  startingCSV: sandboxed-containers-operator.v1.13.0
   installPlanApproval: Manual

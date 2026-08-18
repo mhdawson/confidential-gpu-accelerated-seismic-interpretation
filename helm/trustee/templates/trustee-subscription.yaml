@@ -11,5 +11,11 @@ spec:
   name: trustee-operator
   source: redhat-operators
   sourceNamespace: openshift-marketplace
-  startingCSV: trustee-operator.v1.1.0
+  startingCSV: trustee-operator.v1.2.0
   installPlanApproval: Manual
+  config:
+    resources:
+      limits:
+        memory: 512Mi
+      requests:
+        memory: 128Mi
