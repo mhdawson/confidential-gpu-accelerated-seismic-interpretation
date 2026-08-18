@@ -1087,8 +1087,9 @@ To manually install Trustee:
 6. Set **Installation mode** to "A specific namespace"
 7. Under **Installed Namespace**, select **Create namespace** and enter `trustee-operator-system`
 8. Set **Update approval** to **Manual**
-9. Click **Install**, then go to **Operators → Installed Operators**, select namespace `trustee-operator-system`, click **Upgrade available** and approve the InstallPlan
-10. Wait until the status shows **Succeeded**
+9. Set **Starting version** to `trustee-operator.v1.2.0`
+10. Click **Install**, then go to **Operators → Installed Operators**, select namespace `trustee-operator-system`, click **Upgrade available** and approve the InstallPlan
+11. Wait until the status shows **Succeeded**
 
 #### Step 2: Create the cert-manager Issuer and TLS Certificates
 
