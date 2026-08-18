@@ -1237,9 +1237,9 @@ In addition it can be modified to validate the following values:
 | `rtmr_0` | UEFI firmware measurement | OSC version |
 | `rtmr_3` | Runtime configuration measurement | OSC version |
 
-In the quickstart, the `mr_config_id` is computed at registration time from the full initdata blob: it covers the KBS URL, KBS TLS certificate, namespace, app and model image repos, and the exec-deny policy (policy.rego). For the quickstart we have generated and captured the required values for the other entries for OSC 1.13.1 and included a make target that can be used to capture those values if you are using a different OSC version. For production deployments [veritas](https://github.com/confidential-devhub/veritas) is a tool that can help the model owner get the RVPS values needed without needing to have access to the application deployer's environment.
+In the quickstart, the `mr_config_id` is computed at registration time from the full initdata blob: it covers the KBS URL, KBS TLS certificate, namespace, app and model image repos, and the exec-deny policy (policy.rego). For the quickstart we have generated and captured the required values for the other entries for OSC 1.13.0 and included a make target that can be used to capture those values if you are using a different OSC version. For production deployments [veritas](https://github.com/confidential-devhub/veritas) is a tool that can help the model owner get the RVPS values needed without needing to have access to the application deployer's environment.
 
-In the quickstart we set all of the values when registering RVPS values. Any change to any of these requires re-running `make set-rvps-values`. The TDX hardware measurements are stable for a given OSC version — the Makefile already contains the correct values for OSC **1.13.1** (see the `TDX_MR_TD` block near `KATA_RUNTIME_CLASS` in the Makefile).
+In the quickstart we set all of the values when registering RVPS values. Any change to any of these requires re-running `make set-rvps-values`. The TDX hardware measurements are stable for a given OSC version — the Makefile already contains the correct values for OSC **1.13.0** (see the `TDX_MR_TD` block near `KATA_RUNTIME_CLASS` in the Makefile).
 
 <details open>
 <summary>Make instructions</summary>
@@ -1272,7 +1272,7 @@ MR_CONFIG_ID=$(echo "$KBS_CERT" | python3 scripts/build-initdata.py \
     --model-image "$MODEL_IMG")
 echo "mr_config_id: $MR_CONFIG_ID"
 
-# TDX hardware reference values for OSC 1.13.1 / kata-cc-nvidia-gpu.
+# TDX hardware reference values for OSC 1.13.0 / kata-cc-nvidia-gpu.
 # If you are running a different OSC version, see the note below.
 TDX_TD_ATTRIBUTES=0000001000000000
 TDX_MR_TD=27fb849fb05653add8be4b8c5b2793e66d1e25773a5c6f80dabbc10a5cb18bc40b7d5caaaf299e3a200f7018cdaa6f74
