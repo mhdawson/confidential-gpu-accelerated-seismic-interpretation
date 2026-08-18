@@ -524,19 +524,7 @@ Verify that output indicates that everything is installed as expected:
   PASS: 24   FAIL: 0   WARN: 0
 ```
 
-> **Intel TDX: Provisioning Certificate Caching Service (PCCS)**
->
-> When a TDX pod generates an attestation quote, the quote must be verified against Intel's certificate chain to prove the CPU is genuine Intel hardware running legitimate TDX firmware. By default, the attestation agent fetches these certificates directly from Intel's online Provisioning Certificate Service (PCS) on each attestation.
->
-> Running a local **Provisioning Certificate Caching Service (PCCS)** is recommended even when outbound internet access is not restricted, for several reasons:
-> - **Reliability** — attestation does not fail if Intel's online PCS is temporarily unavailable.
-> - **Performance** — a local cache eliminates per-attestation round-trip latency to Intel's servers.
-> - **Privacy** — without PCCS, every TDX node calls Intel's PCS directly, letting Intel observe per-platform activity. With PCCS, only the caching service contacts Intel.
-> - **Compliance** — in regulated environments, having a single auditable egress point for Intel certificate fetching is easier to control than every node reaching the internet independently.
->
-> PCCS only serves Intel-signed certificates — a compromised PCCS cannot forge trust or produce fake attestation quotes, since all certificates are verified against Intel's root CA. However, a stale or tampered PCCS could serve outdated revocation lists (CRLs) or TCB (Trusted Computing Base) data, which would prevent the system from detecting known vulnerabilities in platform firmware. For this reason, PCCS should run on trusted, well-maintained infrastructure — not on the same untrusted workload cluster — and should be kept updated so that revocation and TCB information stays current.
->
-> This quickstart deploys QGS via the Intel TDX DCAP Operator using `platformRegistration.Online` — QGS contacts Intel PCS directly with an API key, so no local PCCS is required. AMD SEV-SNP does not require QGS or PCCS.
+Make sure that all checks pass before moving to the next section.
 
 ---
 
