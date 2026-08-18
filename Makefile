@@ -1389,6 +1389,16 @@ setup-trustee-in-cluster:
 	    echo "WARNING: TrusteeConfig already exists — KBS already deployed, skipping."; \
 	else \
 	    oc apply -f helm/trustee/templates/trustee-config.yaml; \
+	    echo "Waiting for trustee-deployment to be created by the operator..."; \
+	    DEADLINE=$$(( $$(date +%s) + 120 )); \
+	    until oc get deployment trustee-deployment -n trustee-operator-system \
+	            --ignore-not-found 2>/dev/null | grep -q .; do \
+	        if [ $$(date +%s) -ge $$DEADLINE ]; then \
+	            echo "ERROR: trustee-deployment not created after 2 min — check operator logs."; \
+	            exit 1; \
+	        fi; \
+	        sleep 5; \
+	    done; \
 	    oc rollout status deployment/trustee-deployment \
 	        -n trustee-operator-system --timeout=5m; \
 	fi; \
