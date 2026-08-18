@@ -1992,8 +1992,7 @@ oc exec -n $NAMESPACE $POD -c app -- /bin/sh
 
 **Expected outcome:**
 ```
-Error from server: admission webhook denied the request:
-kata-agent policy: ExecProcessRequest is not permitted
+error: Internal error occurred: error executing command in container: cannot enter container 4a1584dbe11077c5fcce3d14e72a9636b4a8d2f0ea331d8136922264286a1e36, with err rpc error: code = PermissionDenied desc = "ExecProcessRequest is blocked by policy: ": unknown
 ```
 
 Try the same through the OpenShift web console:
