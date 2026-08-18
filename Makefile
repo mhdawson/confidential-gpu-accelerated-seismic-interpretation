@@ -1390,11 +1390,11 @@ setup-trustee-in-cluster:
 	else \
 	    oc apply -f helm/trustee/templates/trustee-config.yaml; \
 	    echo "Waiting for trustee-deployment to be created by the operator..."; \
-	    DEADLINE=$$(( $$(date +%s) + 120 )); \
+	    DEADLINE=$$(( $$(date +%s) + 300 )); \
 	    until oc get deployment trustee-deployment -n trustee-operator-system \
 	            --ignore-not-found 2>/dev/null | grep -q .; do \
 	        if [ $$(date +%s) -ge $$DEADLINE ]; then \
-	            echo "ERROR: trustee-deployment not created after 2 min — check operator logs."; \
+	            echo "ERROR: trustee-deployment not created after 5 min — check operator logs."; \
 	            exit 1; \
 	        fi; \
 	        sleep 5; \

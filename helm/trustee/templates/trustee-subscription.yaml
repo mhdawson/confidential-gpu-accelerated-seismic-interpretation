@@ -13,3 +13,9 @@ spec:
   sourceNamespace: openshift-marketplace
   startingCSV: trustee-operator.v1.1.0
   installPlanApproval: Manual
+  config:
+    resources:
+      limits:
+        memory: 512Mi
+      requests:
+        memory: 128Mi
