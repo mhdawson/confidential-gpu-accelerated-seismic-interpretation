@@ -718,13 +718,13 @@ data:
 Before applying KataConfig, determine your cluster type — this controls which MachineConfigPool kata is installed on:
 
 ```bash
-oc get mcp worker -o jsonpath='{.status.machineCount}'
+oc get nodes -l 'node-role.kubernetes.io/worker,!node-role.kubernetes.io/master' --no-headers | wc -l
 ```
 
-- **Returns `0`** — single-node cluster: the only node is in the master MCP (common in SNO and small dev clusters). Use the **single-node** KataConfig below.
-- **Returns `1` or more** — multi-node cluster: worker nodes exist in the worker MCP. Use the **multi-node** KataConfig below.
+- **Returns `0`** — single-node cluster: no nodes have the `worker` role without also having `master` (common in SNO and compact clusters). Use the **single-node** KataConfig below.
+- **Returns `1` or more** — multi-node cluster: dedicated worker nodes exist. Use the **multi-node** KataConfig below.
 
-Apply the KataConfig to start the node reboot rollout. **Single-node** (worker MCP count = 0):
+Apply the KataConfig to start the node reboot rollout. **Single-node** (no dedicated worker nodes):
 
 ```bash
 oc apply -f - <<'EOF'
@@ -742,7 +742,7 @@ spec:
 EOF
 ```
 
-**Multi-node** (worker MCP count ≥ 1):
+**Multi-node** (dedicated worker nodes exist):
 
 ```bash
 oc apply -f - <<'EOF'
