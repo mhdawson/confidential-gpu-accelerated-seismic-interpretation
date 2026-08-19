@@ -2563,7 +2563,8 @@ oc delete kataconfig example-kataconfig
 oc delete machineconfig 99-enable-intel-tdx
 oc delete machineconfig 100-iommu-kernel-args
 oc delete kubeletconfig kata-runtime-request-timeout
-oc delete nodefeaturerule tdx-features
+oc delete nodefeaturerules.nfd.openshift.io tdx-features -n openshift-nfd --ignore-not-found
+oc delete nodefeaturerules.nfd.k8s-sigs.io tdx-features -n openshift-nfd --ignore-not-found
 oc delete subscription sandboxed-containers-operator -n openshift-sandboxed-containers-operator
 oc delete namespace openshift-sandboxed-containers-operator
 oc delete crd kataconfigs.kataconfiguration.openshift.io
