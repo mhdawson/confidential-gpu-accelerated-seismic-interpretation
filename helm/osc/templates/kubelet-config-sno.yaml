@@ -5,7 +5,7 @@ metadata:
 spec:
   machineConfigPoolSelector:
     matchLabels:
-      machineconfiguration.openshift.io/role: master
+      pools.operator.machineconfiguration.openshift.io/master: ""
   kubeletConfig:
     # CDH pulls and unpacks the app image (~4.6 GB compressed) from the registry
     # inside the kata VM on every pod start. This takes longer than the default

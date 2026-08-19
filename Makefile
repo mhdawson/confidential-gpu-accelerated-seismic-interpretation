@@ -836,9 +836,9 @@ setup-kata:
 	PURE_WORKERS=$$(oc get nodes -l 'node-role.kubernetes.io/worker,!node-role.kubernetes.io/master' \
 	    --no-headers 2>/dev/null | wc -l | tr -d ' '); \
 	if [ "$$PURE_WORKERS" = "0" ]; then KATA_MCP=master; else KATA_MCP=kata-oc; fi; \
-	echo "Waiting for MachineConfigPool $$KATA_MCP rollout (up to 30 min)..."; \
+	echo "Waiting for MachineConfigPool $$KATA_MCP rollout (up to 45 min)..."; \
 	if [ "$$KATA_CHANGED" = "true" ]; then SEEN_UPDATING=false; else SEEN_UPDATING=true; fi; \
-	DEADLINE=$$(( $$(date +%s) + 1800 )); \
+	DEADLINE=$$(( $$(date +%s) + 2700 )); \
 	while [ $$(date +%s) -lt $$DEADLINE ]; do \
 	    STATUS=$$(oc get mcp $$KATA_MCP --no-headers 2>/dev/null | awk '{print $$3,$$4,$$5}'); \
 	    if [ "$$STATUS" != "True False False" ]; then SEEN_UPDATING=true; fi; \
@@ -848,7 +848,7 @@ setup-kata:
 	    sleep 10; \
 	done; \
 	if [ $$(date +%s) -ge $$DEADLINE ]; then \
-	    echo "ERROR: MachineConfigPool $$KATA_MCP did not complete in 30 min."; \
+	    echo "ERROR: MachineConfigPool $$KATA_MCP did not complete in 45 min."; \
 	    echo "       Run: oc get mcp && oc get nodes"; \
 	    exit 1; \
 	fi; \
@@ -908,9 +908,9 @@ setup-kata:
 	fi; \
 	echo "$$KUBELET_APPLY_OUT"; \
 	if echo "$$KUBELET_APPLY_OUT" | grep -q unchanged; then KUBELET_CHANGED=false; else KUBELET_CHANGED=true; fi; \
-	echo "KubeletConfig applied — waiting for MachineConfigPool $$KUBELET_MCP rollout..."; \
+	echo "KubeletConfig applied — waiting for MachineConfigPool $$KUBELET_MCP rollout (up to 45 min)..."; \
 	if [ "$$KUBELET_CHANGED" = "true" ]; then SEEN_UPDATING=false; else SEEN_UPDATING=true; fi; \
-	DEADLINE=$$(( $$(date +%s) + 1800 )); \
+	DEADLINE=$$(( $$(date +%s) + 2700 )); \
 	while [ $$(date +%s) -lt $$DEADLINE ]; do \
 	    STATUS=$$(oc get mcp $$KUBELET_MCP --no-headers 2>/dev/null | awk '{print $$3,$$4,$$5}'); \
 	    if [ "$$STATUS" != "True False False" ]; then SEEN_UPDATING=true; fi; \
@@ -920,7 +920,7 @@ setup-kata:
 	    sleep 10; \
 	done; \
 	if [ $$(date +%s) -ge $$DEADLINE ]; then \
-	    echo "ERROR: MachineConfigPool $$KUBELET_MCP did not complete in 30 min."; \
+	    echo "ERROR: MachineConfigPool $$KUBELET_MCP did not complete in 45 min."; \
 	    echo "       Run: oc get mcp && oc get nodes"; \
 	    exit 1; \
 	fi; \
