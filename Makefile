@@ -769,15 +769,23 @@ setup-kata:
 	    oc apply -f helm/osc/templates/node-feature-rule.yaml; \
 	    echo "NodeFeatureRule applied."; \
 	fi; \
-	echo "Verifying TEE node label..."; \
-	if oc get node -o jsonpath='{.items[*].metadata.labels}' 2>/dev/null \
-	        | grep -q "intel.feature.node.kubernetes.io/tdx"; then \
-	    echo "TEE label detected: intel.feature.node.kubernetes.io/tdx"; \
-	elif oc get node -o jsonpath='{.items[*].metadata.labels}' 2>/dev/null \
-	        | grep -q "amd.feature.node.kubernetes.io/snp"; then \
-	    echo "TEE label detected: amd.feature.node.kubernetes.io/snp"; \
+	echo "Verifying TEE node label (waiting up to 2 min for NFD to reconcile)..."; \
+	TEE_LABEL=""; \
+	DEADLINE=$$(( $$(date +%s) + 120 )); \
+	while [ $$(date +%s) -lt $$DEADLINE ]; do \
+	    if oc get node -o jsonpath='{.items[*].metadata.labels}' 2>/dev/null \
+	            | grep -q "intel.feature.node.kubernetes.io/tdx"; then \
+	        TEE_LABEL="intel.feature.node.kubernetes.io/tdx"; break; \
+	    elif oc get node -o jsonpath='{.items[*].metadata.labels}' 2>/dev/null \
+	            | grep -q "amd.feature.node.kubernetes.io/snp"; then \
+	        TEE_LABEL="amd.feature.node.kubernetes.io/snp"; break; \
+	    fi; \
+	    sleep 10; \
+	done; \
+	if [ -n "$$TEE_LABEL" ]; then \
+	    echo "TEE label detected: $$TEE_LABEL"; \
 	else \
-	    echo "ERROR: No TEE label found (intel.feature.node.kubernetes.io/tdx or amd.feature.node.kubernetes.io/snp)."; \
+	    echo "ERROR: No TEE label found (intel.feature.node.kubernetes.io/tdx or amd.feature.node.kubernetes.io/snp) after 2 min."; \
 	    echo "       Ensure BIOS TDX/SNP is enabled and setup-intel-tee/setup-amd-tee completed successfully."; \
 	    exit 1; \
 	fi; \
