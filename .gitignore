@@ -11,6 +11,8 @@ results/
 volve_validation/
 results/*.png
 volve_validation/*.png
+test/results/
+test/playwright/bin/
 
 # Python / editor artefacts
 __pycache__/

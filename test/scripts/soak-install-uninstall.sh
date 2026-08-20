@@ -6,7 +6,7 @@
 # continuing to loop.
 #
 # Usage:
-#   ./scripts/soak-install-uninstall.sh <namespace> [max_runs]
+#   ./test/scripts/soak-install-uninstall.sh <namespace> [max_runs]
 #
 # Env overrides:
 #   INSTALL_TIMEOUT   seconds to wait for the pod to become Running 1/1 (default 600)
@@ -16,7 +16,7 @@
 
 set -uo pipefail
 
-REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+REPO_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$REPO_ROOT" || exit 1
 
 NAMESPACE="${1:-}"
