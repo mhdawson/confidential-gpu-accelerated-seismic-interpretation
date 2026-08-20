@@ -1,8 +1,9 @@
 #!/bin/bash
 # Repeatedly installs and uninstalls to validate consistent start/stop
 # behavior. Each cycle: make install -> wait for a Running 1/1 seismic-app pod
-# -> make uninstall -> wait for no seismic-app pods left. Stops immediately on
-# the first cycle that fails either wait, rather than continuing to loop.
+# -> pause -> make uninstall -> wait for no seismic-app pods left. Stops
+# immediately on the first cycle that fails either wait, rather than
+# continuing to loop.
 #
 # Usage:
 #   ./scripts/soak-install-uninstall.sh <namespace> [max_runs]
@@ -11,7 +12,7 @@
 #   INSTALL_TIMEOUT   seconds to wait for the pod to become Running 1/1 (default 600)
 #   UNINSTALL_TIMEOUT seconds to wait for all seismic-app pods to disappear (default 300)
 #   POLL_INTERVAL     seconds between polls (default 5)
-#   INTER_RUN_DELAY   seconds to wait between cycles (default 30)
+#   POST_INSTALL_DELAY seconds to wait after install completes before uninstalling (default 30)
 
 set -uo pipefail
 
@@ -23,7 +24,7 @@ MAX_RUNS="${2:-100}"
 INSTALL_TIMEOUT="${INSTALL_TIMEOUT:-600}"
 UNINSTALL_TIMEOUT="${UNINSTALL_TIMEOUT:-300}"
 POLL_INTERVAL="${POLL_INTERVAL:-5}"
-INTER_RUN_DELAY="${INTER_RUN_DELAY:-30}"
+POST_INSTALL_DELAY="${POST_INSTALL_DELAY:-30}"
 
 if [ -z "$NAMESPACE" ]; then
     echo "Usage: $0 <namespace> [max_runs]"
@@ -85,6 +86,9 @@ for i in $(seq 1 "$MAX_RUNS"); do
     INSTALL_ELAPSED=$(( $(date +%s) - INSTALL_START ))
     echo "Run $i: install complete (${INSTALL_ELAPSED}s)."
 
+    echo "Waiting ${POST_INSTALL_DELAY}s before uninstalling..."
+    sleep "$POST_INSTALL_DELAY"
+
     echo "=== Run $i/$MAX_RUNS: make uninstall NAMESPACE=$NAMESPACE ==="
     UNINSTALL_START=$(date +%s)
     if ! make uninstall NAMESPACE="$NAMESPACE"; then
@@ -103,11 +107,6 @@ for i in $(seq 1 "$MAX_RUNS"); do
 
     ELAPSED=$(( $(date +%s) - START ))
     echo "Run $i: cycle complete (install ${INSTALL_ELAPSED}s + uninstall ${UNINSTALL_ELAPSED}s = ${ELAPSED}s total)."
-
-    if [ "$i" -lt "$MAX_RUNS" ]; then
-        echo "Waiting ${INTER_RUN_DELAY}s before next run..."
-        sleep "$INTER_RUN_DELAY"
-    fi
 done
 
 echo ""
