@@ -769,15 +769,23 @@ setup-kata:
 	    oc apply -f helm/osc/templates/node-feature-rule.yaml; \
 	    echo "NodeFeatureRule applied."; \
 	fi; \
-	echo "Verifying TEE node label..."; \
-	if oc get node -o jsonpath='{.items[*].metadata.labels}' 2>/dev/null \
-	        | grep -q "intel.feature.node.kubernetes.io/tdx"; then \
-	    echo "TEE label detected: intel.feature.node.kubernetes.io/tdx"; \
-	elif oc get node -o jsonpath='{.items[*].metadata.labels}' 2>/dev/null \
-	        | grep -q "amd.feature.node.kubernetes.io/snp"; then \
-	    echo "TEE label detected: amd.feature.node.kubernetes.io/snp"; \
+	echo "Verifying TEE node label (waiting up to 2 min for NFD to reconcile)..."; \
+	TEE_LABEL=""; \
+	DEADLINE=$$(( $$(date +%s) + 120 )); \
+	while [ $$(date +%s) -lt $$DEADLINE ]; do \
+	    if oc get node -o jsonpath='{.items[*].metadata.labels}' 2>/dev/null \
+	            | grep -q "intel.feature.node.kubernetes.io/tdx"; then \
+	        TEE_LABEL="intel.feature.node.kubernetes.io/tdx"; break; \
+	    elif oc get node -o jsonpath='{.items[*].metadata.labels}' 2>/dev/null \
+	            | grep -q "amd.feature.node.kubernetes.io/snp"; then \
+	        TEE_LABEL="amd.feature.node.kubernetes.io/snp"; break; \
+	    fi; \
+	    sleep 10; \
+	done; \
+	if [ -n "$$TEE_LABEL" ]; then \
+	    echo "TEE label detected: $$TEE_LABEL"; \
 	else \
-	    echo "ERROR: No TEE label found (intel.feature.node.kubernetes.io/tdx or amd.feature.node.kubernetes.io/snp)."; \
+	    echo "ERROR: No TEE label found (intel.feature.node.kubernetes.io/tdx or amd.feature.node.kubernetes.io/snp) after 2 min."; \
 	    echo "       Ensure BIOS TDX/SNP is enabled and setup-intel-tee/setup-amd-tee completed successfully."; \
 	    exit 1; \
 	fi; \
@@ -812,6 +820,7 @@ setup-kata:
 	fi; \
 	if oc get kataconfig --ignore-not-found 2>/dev/null | grep -q .; then \
 	    echo "WARNING: KataConfig already exists, skipping."; \
+	    KATA_CHANGED=false; \
 	else \
 	    PURE_WORKERS=$$(oc get nodes -l 'node-role.kubernetes.io/worker,!node-role.kubernetes.io/master' \
 	        --no-headers 2>/dev/null | wc -l | tr -d ' '); \
@@ -822,21 +831,24 @@ setup-kata:
 	        echo "WARNING: Multi-node cluster — using default KataConfig (nodes reboot in sequence)."; \
 	        oc apply -f helm/osc/templates/kataconfig.yaml; \
 	    fi; \
+	    KATA_CHANGED=true; \
 	fi; \
 	PURE_WORKERS=$$(oc get nodes -l 'node-role.kubernetes.io/worker,!node-role.kubernetes.io/master' \
 	    --no-headers 2>/dev/null | wc -l | tr -d ' '); \
 	if [ "$$PURE_WORKERS" = "0" ]; then KATA_MCP=master; else KATA_MCP=kata-oc; fi; \
-	echo "Waiting for MachineConfigPool $$KATA_MCP rollout (up to 30 min)..."; \
-	DEADLINE=$$(( $$(date +%s) + 1800 )); \
+	echo "Waiting for MachineConfigPool $$KATA_MCP rollout (up to 45 min)..."; \
+	if [ "$$KATA_CHANGED" = "true" ]; then SEEN_UPDATING=false; else SEEN_UPDATING=true; fi; \
+	DEADLINE=$$(( $$(date +%s) + 2700 )); \
 	while [ $$(date +%s) -lt $$DEADLINE ]; do \
-	    if oc get mcp $$KATA_MCP --no-headers 2>/dev/null \
-	            | awk '{print $$3,$$4,$$5}' | grep -q "True False False"; then \
+	    STATUS=$$(oc get mcp $$KATA_MCP --no-headers 2>/dev/null | awk '{print $$3,$$4,$$5}'); \
+	    if [ "$$STATUS" != "True False False" ]; then SEEN_UPDATING=true; fi; \
+	    if [ "$$SEEN_UPDATING" = "true" ] && [ "$$STATUS" = "True False False" ]; then \
 	        echo "MachineConfigPool $$KATA_MCP is updated."; break; \
 	    fi; \
-	    sleep 30; \
+	    sleep 10; \
 	done; \
 	if [ $$(date +%s) -ge $$DEADLINE ]; then \
-	    echo "ERROR: MachineConfigPool $$KATA_MCP did not complete in 30 min."; \
+	    echo "ERROR: MachineConfigPool $$KATA_MCP did not complete in 45 min."; \
 	    echo "       Run: oc get mcp && oc get nodes"; \
 	    exit 1; \
 	fi; \
@@ -888,23 +900,27 @@ setup-kata:
 	PURE_WORKERS=$$(oc get nodes -l 'node-role.kubernetes.io/worker,!node-role.kubernetes.io/master' \
 	    --no-headers 2>/dev/null | wc -l | tr -d ' '); \
 	if [ "$$PURE_WORKERS" = "0" ]; then \
-	    oc apply -f helm/osc/templates/kubelet-config-sno.yaml; \
+	    KUBELET_APPLY_OUT=$$(oc apply -f helm/osc/templates/kubelet-config-sno.yaml); \
 	    KUBELET_MCP=master; \
 	else \
-	    oc apply -f helm/osc/templates/kubelet-config.yaml; \
+	    KUBELET_APPLY_OUT=$$(oc apply -f helm/osc/templates/kubelet-config.yaml); \
 	    KUBELET_MCP=worker; \
 	fi; \
-	echo "KubeletConfig applied — waiting for MachineConfigPool $$KUBELET_MCP rollout..."; \
-	DEADLINE=$$(( $$(date +%s) + 1800 )); \
+	echo "$$KUBELET_APPLY_OUT"; \
+	if echo "$$KUBELET_APPLY_OUT" | grep -q unchanged; then KUBELET_CHANGED=false; else KUBELET_CHANGED=true; fi; \
+	echo "KubeletConfig applied — waiting for MachineConfigPool $$KUBELET_MCP rollout (up to 45 min)..."; \
+	if [ "$$KUBELET_CHANGED" = "true" ]; then SEEN_UPDATING=false; else SEEN_UPDATING=true; fi; \
+	DEADLINE=$$(( $$(date +%s) + 2700 )); \
 	while [ $$(date +%s) -lt $$DEADLINE ]; do \
-	    if oc get mcp $$KUBELET_MCP --no-headers 2>/dev/null \
-	            | awk '{print $$3,$$4,$$5}' | grep -q "True False False"; then \
+	    STATUS=$$(oc get mcp $$KUBELET_MCP --no-headers 2>/dev/null | awk '{print $$3,$$4,$$5}'); \
+	    if [ "$$STATUS" != "True False False" ]; then SEEN_UPDATING=true; fi; \
+	    if [ "$$SEEN_UPDATING" = "true" ] && [ "$$STATUS" = "True False False" ]; then \
 	        echo "MachineConfigPool $$KUBELET_MCP is updated."; break; \
 	    fi; \
-	    sleep 30; \
+	    sleep 10; \
 	done; \
 	if [ $$(date +%s) -ge $$DEADLINE ]; then \
-	    echo "ERROR: MachineConfigPool $$KUBELET_MCP did not complete in 30 min."; \
+	    echo "ERROR: MachineConfigPool $$KUBELET_MCP did not complete in 45 min."; \
 	    echo "       Run: oc get mcp && oc get nodes"; \
 	    exit 1; \
 	fi; \
