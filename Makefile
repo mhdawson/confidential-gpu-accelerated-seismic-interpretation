@@ -608,6 +608,79 @@ uninstall:
 	helm uninstall seismic-app -n $(NAMESPACE) --ignore-not-found
 	@echo "seismic-app uninstalled from $(NAMESPACE)"
 
+.PHONY: test
+test:
+	@[ -n "$$NAMESPACE" ] || (echo "Error: NAMESPACE is not set"; exit 1)
+	@set -e; \
+	if [ "$(INSTALL)" = "1" ]; then \
+	    echo "=== test: make install ==="; \
+	    $(MAKE) install NAMESPACE=$(NAMESPACE); \
+	else \
+	    echo "=== test: INSTALL not set, assuming seismic-app is already deployed ==="; \
+	fi; \
+	echo "Waiting for seismic-app pod to be Running and Ready..."; \
+	POD_READY=false; \
+	DEADLINE=$$(( $$(date +%s) + 900 )); \
+	while [ $$(date +%s) -lt $$DEADLINE ]; do \
+	    LINE=$$(oc get pods -n $(NAMESPACE) --no-headers 2>/dev/null | grep '^seismic-app' | head -1); \
+	    if [ -n "$$LINE" ]; then \
+	        READY=$$(echo "$$LINE" | awk '{print $$2}'); \
+	        STATUS=$$(echo "$$LINE" | awk '{print $$3}'); \
+	        READY_N=$${READY%%/*}; TOTAL_N=$${READY#*/}; \
+	        if [ "$$STATUS" = "Running" ] && [ -n "$$READY_N" ] && [ "$$READY_N" = "$$TOTAL_N" ]; then \
+	            POD_READY=true; break; \
+	        fi; \
+	    fi; \
+	    sleep 5; \
+	done; \
+	if [ "$$POD_READY" != "true" ]; then \
+	    echo "ERROR: seismic-app pod did not become Running/Ready within 10 min."; \
+	    oc get pods -n $(NAMESPACE); \
+	    exit 1; \
+	fi; \
+	echo "Pod is up."; \
+	HOST=$$(oc get route seismic-app -n $(NAMESPACE) -o jsonpath='{.spec.host}' 2>/dev/null); \
+	if [ -z "$$HOST" ]; then \
+	    echo "ERROR: could not resolve route host for seismic-app -n $(NAMESPACE)."; \
+	    exit 1; \
+	fi; \
+	echo "=== test: UI smoke test against https://$$HOST ==="; \
+	PLAYWRIGHT_BROWSERS_PATH="$(CURDIR)/test/playwright/bin"; \
+	export PLAYWRIGHT_BROWSERS_PATH; \
+	if [ -z "$$(ls -A "$$PLAYWRIGHT_BROWSERS_PATH" 2>/dev/null)" ]; then \
+	    echo "Playwright browser binaries not found — installing into $$PLAYWRIGHT_BROWSERS_PATH ..."; \
+	    mkdir -p "$$PLAYWRIGHT_BROWSERS_PATH"; \
+	    uv run --with playwright playwright install chromium; \
+	else \
+	    echo "Playwright browser binaries already present in $$PLAYWRIGHT_BROWSERS_PATH — skipping install."; \
+	fi; \
+	uv run test/scripts/test-ui-e2e.py \
+	    --url "https://$$HOST" \
+	    --sample samples/f3_inline_019.npy \
+	    --screenshot test/results/seismic-ui-result.png \
+	    --sample2 samples/f3_inline_038.npy \
+	    --screenshot2 test/results/seismic-ui-result-2.png; \
+	if [ "$(INSTALL)" != "1" ]; then \
+	    echo "=== test: INSTALL not set, skipping make uninstall ==="; \
+	else \
+	    echo "=== test: make uninstall ==="; \
+	    $(MAKE) uninstall NAMESPACE=$(NAMESPACE); \
+	    echo "Waiting for seismic-app pod(s) to terminate..."; \
+	    CLEARED=false; \
+	    DEADLINE=$$(( $$(date +%s) + 300 )); \
+	    while [ $$(date +%s) -lt $$DEADLINE ]; do \
+	        COUNT=$$(oc get pods -n $(NAMESPACE) --no-headers 2>/dev/null | grep '^seismic-app' | wc -l); \
+	        if [ "$$COUNT" -eq 0 ]; then CLEARED=true; break; fi; \
+	        sleep 5; \
+	    done; \
+	    if [ "$$CLEARED" != "true" ]; then \
+	        echo "ERROR: seismic-app pod(s) did not terminate within 5 min."; \
+	        oc get pods -n $(NAMESPACE); \
+	        exit 1; \
+	    fi; \
+	fi; \
+	echo "=== test PASSED — screenshots: test/results/seismic-ui-result.png, test/results/seismic-ui-result-2.png ==="
+
 .PHONY: clean-terminating-pods
 clean-terminating-pods:
 	@[ -n "$$NAMESPACE" ] || (echo "Error: NAMESPACE is not set"; exit 1)
