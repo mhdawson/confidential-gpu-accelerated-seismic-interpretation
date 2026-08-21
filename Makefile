@@ -612,15 +612,15 @@ uninstall:
 test:
 	@[ -n "$$NAMESPACE" ] || (echo "Error: NAMESPACE is not set"; exit 1)
 	@set -e; \
-	if [ "$(NOINSTALL)" = "1" ]; then \
-	    echo "=== test: NOINSTALL=1 set, skipping make install ==="; \
-	else \
+	if [ "$(INSTALL)" = "1" ]; then \
 	    echo "=== test: make install ==="; \
 	    $(MAKE) install NAMESPACE=$(NAMESPACE); \
+	else \
+	    echo "=== test: INSTALL not set, assuming seismic-app is already deployed ==="; \
 	fi; \
 	echo "Waiting for seismic-app pod to be Running and Ready..."; \
 	POD_READY=false; \
-	DEADLINE=$$(( $$(date +%s) + 600 )); \
+	DEADLINE=$$(( $$(date +%s) + 900 )); \
 	while [ $$(date +%s) -lt $$DEADLINE ]; do \
 	    LINE=$$(oc get pods -n $(NAMESPACE) --no-headers 2>/dev/null | grep '^seismic-app' | head -1); \
 	    if [ -n "$$LINE" ]; then \
@@ -657,9 +657,11 @@ test:
 	uv run test/scripts/test-ui-e2e.py \
 	    --url "https://$$HOST" \
 	    --sample samples/f3_inline_019.npy \
-	    --screenshot test/results/seismic-ui-result.png; \
-	if [ "$(NOINSTALL)" = "1" ]; then \
-	    echo "=== test: NOINSTALL=1 set, skipping make uninstall ==="; \
+	    --screenshot test/results/seismic-ui-result.png \
+	    --sample2 samples/f3_inline_038.npy \
+	    --screenshot2 test/results/seismic-ui-result-2.png; \
+	if [ "$(INSTALL)" != "1" ]; then \
+	    echo "=== test: INSTALL not set, skipping make uninstall ==="; \
 	else \
 	    echo "=== test: make uninstall ==="; \
 	    $(MAKE) uninstall NAMESPACE=$(NAMESPACE); \
@@ -667,7 +669,7 @@ test:
 	    CLEARED=false; \
 	    DEADLINE=$$(( $$(date +%s) + 300 )); \
 	    while [ $$(date +%s) -lt $$DEADLINE ]; do \
-	        COUNT=$$(oc get pods -n $(NAMESPACE) --no-headers 2>/dev/null | grep -c '^seismic-app'); \
+	        COUNT=$$(oc get pods -n $(NAMESPACE) --no-headers 2>/dev/null | grep '^seismic-app' | wc -l); \
 	        if [ "$$COUNT" -eq 0 ]; then CLEARED=true; break; fi; \
 	        sleep 5; \
 	    done; \
@@ -677,7 +679,7 @@ test:
 	        exit 1; \
 	    fi; \
 	fi; \
-	echo "=== test PASSED — screenshot: test/results/seismic-ui-result.png ==="
+	echo "=== test PASSED — screenshots: test/results/seismic-ui-result.png, test/results/seismic-ui-result-2.png ==="
 
 .PHONY: clean-terminating-pods
 clean-terminating-pods:

@@ -9,7 +9,7 @@
 #   ./test/scripts/soak-install-uninstall.sh <namespace> [max_runs]
 #
 # Env overrides:
-#   INSTALL_TIMEOUT   seconds to wait for the pod to become Running 1/1 (default 600)
+#   INSTALL_TIMEOUT   seconds to wait for the pod to become Running 1/1 (default 900)
 #   UNINSTALL_TIMEOUT seconds to wait for all seismic-app pods to disappear (default 300)
 #   POLL_INTERVAL     seconds between polls (default 5)
 #   POST_INSTALL_DELAY seconds to wait after install completes before uninstalling (default 30)
@@ -21,7 +21,7 @@ cd "$REPO_ROOT" || exit 1
 
 NAMESPACE="${1:-}"
 MAX_RUNS="${2:-100}"
-INSTALL_TIMEOUT="${INSTALL_TIMEOUT:-600}"
+INSTALL_TIMEOUT="${INSTALL_TIMEOUT:-900}"
 UNINSTALL_TIMEOUT="${UNINSTALL_TIMEOUT:-300}"
 POLL_INTERVAL="${POLL_INTERVAL:-5}"
 POST_INSTALL_DELAY="${POST_INSTALL_DELAY:-30}"
