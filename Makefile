@@ -126,6 +126,9 @@ help:
 	@echo "                               Requires setup-kata to have completed first"
 	@echo "    verify-gpu-passthrough   - Check ClusterPolicy settings, node labels, VFIO/sandbox pods,"
 	@echo "                               and pgpu allocatable resources for kata GPU passthrough"
+	@echo "    rescan-gpus              - Restart nvidia-kata-sandbox-device-plugin pod(s) to force a fresh"
+	@echo "                               vfio-pci device scan — fixes pgpu showing 0 when the plugin started"
+	@echo "                               before vfio-manager finished rebinding the GPU(s)"
 	@echo "    validate-node-labels     - Print required node labels for kata-cc-nvidia-gpu on all GPU nodes"
 	@echo "                               Shows TEE label, CC mode state, vfio-manager, cc-manager status"
 	@echo "    setup-dcap               - Deploy Intel SGX Device Plugin and Intel TDX DCAP Operator (QGS + PCCS)"
@@ -1279,6 +1282,36 @@ verify-gpu-passthrough:
 	else \
 	    echo "  GPU passthrough is correctly configured. Ready for: make install"; \
 	fi
+
+.PHONY: rescan-gpus
+rescan-gpus:
+	@set -e; \
+	PODS=$$(oc get pods -n nvidia-gpu-operator --no-headers 2>/dev/null \
+	    | grep '^nvidia-kata-sandbox-device-plugin-daemonset-' | awk '{print $$1}'); \
+	if [ -z "$$PODS" ]; then \
+	    echo "WARNING: no nvidia-kata-sandbox-device-plugin-daemonset pods found in nvidia-gpu-operator — nothing to rescan."; \
+	    exit 0; \
+	fi; \
+	TOTAL=$$(echo "$$PODS" | wc -l); \
+	echo "Deleting $$TOTAL sandbox device plugin pod(s) to force a fresh vfio-pci device scan:"; \
+	echo "$$PODS"; \
+	oc delete pod -n nvidia-gpu-operator $$PODS; \
+	echo "Waiting up to 2 min for replacement pod(s) to be Running..."; \
+	READY=false; \
+	DEADLINE=$$(( $$(date +%s) + 120 )); \
+	while [ $$(date +%s) -lt $$DEADLINE ]; do \
+	    READY_COUNT=$$(oc get pods -n nvidia-gpu-operator --no-headers 2>/dev/null \
+	        | grep '^nvidia-kata-sandbox-device-plugin-daemonset-' | grep ' Running ' | wc -l); \
+	    if [ "$$READY_COUNT" -ge "$$TOTAL" ]; then READY=true; break; fi; \
+	    sleep 5; \
+	done; \
+	if [ "$$READY" != "true" ]; then \
+	    echo "ERROR: replacement pod(s) did not reach Running within 2 min."; \
+	    oc get pods -n nvidia-gpu-operator | grep sandbox; \
+	    exit 1; \
+	fi; \
+	echo "=== rescan-gpus complete ==="; \
+	echo "Verify with: oc get node <node> -o jsonpath='{.status.allocatable}' | python3 -c \"import json,sys; a=json.load(sys.stdin); print({k:v for k,v in a.items() if 'nvidia' in k})\""
 
 .PHONY: validate-node-labels
 validate-node-labels:

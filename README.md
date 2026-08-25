@@ -467,10 +467,10 @@ Wait for the node to reboot and return to Ready:
 
 ```bash
 # Single-node — API server will be briefly unreachable during reboot:
-oc wait mcp/master --for=condition=Updated=True --timeout=30m
+oc wait mcp/master --for=condition=Updated=True --timeout=45m
 ```
 
-On single-node clusters, the API server itself reboots during this wait, so the command will disconnect for 2–5 minutes. Re-run it once the cluster is reachable again.
+On single-node clusters, the API server itself reboots during this wait. Re-run it once the cluster is reachable again.
 
 
 </details>
@@ -545,7 +545,7 @@ For more on Kata Containers, see the [Kata Containers documentation](https://kat
 
 To automatically install Kata containers and GPU passthrough (after the hardware prerequisite above is complete):
 
-> **WARNING:** `make setup-kata` triggers two separate node reboot rollouts — first from the KataConfig (10–20 minutes), then from the KubeletConfig (another 10–20 minutes). Allow 30–40 minutes total; on single-node clusters the API server will be briefly unreachable during each reboot.
+> **WARNING:** `make setup-kata` triggers two separate node reboot rollouts — first from the KataConfig (10–30 minutes), then from the KubeletConfig (another 10–30 minutes). Allow 20–60 minutes total; on single-node clusters the API server will be unreachable during each reboot.
 
 ```bash
 make setup-kata
@@ -688,7 +688,7 @@ If the label is not present, the BIOS settings are not correctly saved — revis
 
 > **NOTE:** In production, Trustee should run on a dedicated trusted cluster, separate from the cluster running the application workload. The application cluster is considered untrusted — Trustee releases the model decryption key only after the workload passes attestation ensuring that all requirements have been met. This quickstart deploys both Trustee and the application on the same cluster to simplify getting started. If you are running Trustee on a separate trusted cluster, perform this step on the application cluster only — the Trustee cluster does not need OpenShift Sandboxed Containers installed.
 
-> **WARNING:** Applying the KataConfig triggers a node reboot rollout. Worker nodes will restart one at a time and this takes 10–20 minutes.
+> **WARNING:** Applying the KataConfig triggers a node reboot rollout. Worker nodes will restart one at a time and this takes 10–30 minutes.
 
 1. Go to **Operators → OperatorHub**
 2. Search for "OpenShift sandboxed containers"
@@ -759,8 +759,8 @@ EOF
 
 Go to **Compute → MachineConfigPools**:
 
-- **Single-node**: the `master` pool will show `UPDATING=True` then `UPDATED=True`. The node will reboot once — expect ~10 minutes of cluster unavailability.
-- **Multi-node**: a new `kata-oc` pool appears and nodes reboot one at a time (10–20 minutes total).
+- **Single-node**: the `master` pool will show `UPDATING=True` then `UPDATED=True`. The node will reboot once — expect 10-30 minutes of cluster unavailability.
+- **Multi-node**: a new `kata-oc` pool appears and nodes reboot one at a time (10–30 minutes total).
 
 Once the MachineConfigPool shows `UPDATED=True`, confirm the kata runtimeClasses are present:
 
@@ -925,15 +925,16 @@ oc get nodes -o custom-columns=NAME:.metadata.name,ROLES:.metadata.labels
 
 ```bash
 oc apply -f helm/osc/templates/kubelet-config.yaml
-oc wait mcp/worker --for=condition=Updated=True --timeout=30m
 ```
 
 **Single-node cluster / SNO** (node has both `master` and `worker` roles — the node is managed by the `master` MCP):
 
 ```bash
 oc apply -f helm/osc/templates/kubelet-config-sno.yaml
-oc wait mcp/master --for=condition=Updated=True --timeout=30m
 ```
+
+These will trigger a reboot of the node but it might take a minute or so before the reboot starts. Make sure to
+wait until after the reboot is complete before proceeding.
 
 Both files create a `KubeletConfig` named `kata-runtime-request-timeout` with `runtimeRequestTimeout: 10m0s` — the only difference is the `machineConfigPoolSelector` (`worker` vs `master`). Applying the wrong one results in the timeout not taking effect and pods failing with `RST_STREAM CANCEL` during image pull. The `make setup-kata` target auto-detects the cluster type by checking for nodes that are workers but not masters, and applies the correct file.
 
@@ -1807,7 +1808,7 @@ make install NAMESPACE=$NAMESPACE
 ```
 
 This fetches the KBS TLS certificate from the cluster, builds the initdata blob (AA/CDH configuration for the kata VM), and deploys the app via Helm.
-The deployment can take 5 or more minutes and you may see logs like "Error: context deadline exceeded" as the app image is quite large and it must be pulled inside the confidential VM. Despite these logs the application will deploy after the required time to pull and start the container in the confidential virtual machine.
+The deployment can take 5-10 or more minutes and you may see logs like "Error: context deadline exceeded" as the app image is quite large and it must be pulled inside the confidential VM. Despite these logs the application will deploy after the required time to pull and start the container in the confidential virtual machine.
 
 On startup the pod goes through the following sequence inside the kata VM:
 
@@ -1817,7 +1818,7 @@ On startup the pod goes through the following sequence inside the kata VM:
 
 3. **Application container**: runs `decrypt.sh` first — CDH uses its KBS session (established via TDX + GPU attestation) to retrieve the model decryption key, which `decrypt.sh` uses to decrypt `.pth.enc` → `.pth` on the shared volume and then delete the key from local storage. The app then loads the plaintext model and starts the Gradio UI on port 7860.
 
-Wait for both init containers to complete and the app container to reach `Running` (this can take 5 minutes or so and the container may
+Wait for both init containers to complete and the app container to reach `Running` (this can take 5-10 minutes or so and the container may
 show with a CreateContainerError along the way):
 
 ```bash
